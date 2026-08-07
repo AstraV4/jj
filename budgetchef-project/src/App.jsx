@@ -700,7 +700,7 @@ const PHOTO_QUERIES = {
   r93: 'eggplant curry indian', r94: 'teriyaki salmon rice', r95: 'beef empanadas', r96: 'moroccan spiced chicken',
   r97: 'gnocchi tomato basil', r98: 'coconut shrimp curry', r99: 'general tso chicken', r100: 'lentil salad roasted vegetables',
 };
-Object.assign(PHOTO_QUERIES, {"r101":"pancakes moelleux au sirop","r102":"gaufres croustillantes","r103":"porridge avoine banane","r104":"œufs brouillés crémeux","r105":"pain perdu doré","r106":"smoothie bowl fruits rouges","r107":"chia pudding coco","r108":"tartines avocat œuf poché","r109":"crêpes fines","r110":"bowl fromage blanc cacao","r111":"banana bread tranché","r112":"bagel saumon fromage frais","r113":"yaourt granola miel","r114":"overnight oats vanille","r115":"shakshuka œufs tomates","r116":"croque œuf jambon de dinde","r117":"blinis œufs brouillés","r118":"toast pain d’épices ricotta","r119":"toast beurre de cacahuète banane","r120":"compote pomme cannelle express","r121":"tacos de bœuf épicé","r122":"tacos de poulet crème","r123":"burrito haricots bœuf","r124":"quesadilla poulet fromage","r125":"fajitas de poulet","r126":"burger maison bœuf cheddar","r127":"ailes de poulet air fryer","r128":"nuggets de poulet maison","r129":"pizza margherita","r130":"pâtes bolognaise","r131":"pâtes pesto express","r132":"mac and cheese","r133":"lasagnes bolognaise","r134":"hachis parmentier","r135":"chili con carne","r136":"croque-monsieur","r137":"wrap poulet crudités","r138":"kebab maison poulet","r139":"poulet tikka masala","r140":"curry de poulet au coco","r141":"riz cantonais","r142":"nouilles sautées aux légumes","r143":"pad thai","r144":"ramen express au poulet","r145":"poke bowl saumon","r146":"buddha bowl végé","r147":"couscous poulet légumes","r148":"paella express","r149":"risotto aux champignons","r150":"gnocchis sauce tomate","r151":"chili sin carne","r152":"soupe pho express","r153":"minestrone de légumes","r154":"velouté de potiron","r155":"quiche poireaux","r156":"tarte tomate moutarde","r157":"galette sarrasin œuf fromage","r158":"frittata légumes","r159":"boulettes de bœuf sauce tomate","r160":"poulet rôti pommes de terre","r161":"poulet basquaise","r162":"steak haché purée maison","r163":"cordon bleu maison","r164":"fish and chips au four","r165":"saumon teriyaki riz","r166":"cabillaud au four et légumes","r167":"gambas à l’ail","r168":"brochettes de poulet mariné","r169":"wrap falafel houmous","r170":"salade césar poulet","r171":"salade grecque","r172":"salade de quinoa","r173":"pan-bagnat thon","r174":"club sandwich poulet","r175":"enchiladas poulet","r176":"gratin de pâtes jambon","r177":"gratin de courgettes","r178":"riz sauté œuf et légumes","r179":"poêlée patate douce chorizo","r180":"poivrons farcis au riz","r181":"dahl épinards","r182":"nouilles sautées bœuf","r183":"bœuf sauté aux oignons","r184":"soupe à l’oignon gratinée","r185":"omelette espagnole (tortilla)","r186":"naan poulet tandoori","r187":"tartiflette express","r188":"pâtes carbonara","r189":"pizza reine","r190":"bowl thon maïs","r191":"gratin dauphinois","r192":"spaghetti aglio e olio","r193":"tofu sauté sésame","r194":"blanquette de dinde express","r195":"œufs cocotte tomate","r196":"wok de légumes croquants","r197":"chili bowl riz avocat","r198":"soupe nouilles miso tofu","r199":"pita poulet grillé","r200":"omelette jambon fromage","r201":"frites de patate douce & dip","r202":"ratatouille","r203":"riz au poulet coco épinards","r204":"tacos poisson pané","r205":"croque veggie","r206":"one-pot pâtes tomate mozza"});
+Object.assign(PHOTO_QUERIES, {"r101":"fluffy pancakes maple syrup","r102":"belgian waffles","r103":"oatmeal porridge banana","r104":"scrambled eggs toast","r105":"french toast","r106":"berry smoothie bowl","r107":"chia pudding coconut","r108":"avocado toast poached egg","r109":"thin crepes","r110":"chocolate yogurt bowl","r111":"banana bread slices","r112":"salmon bagel cream cheese","r113":"yogurt granola honey","r114":"overnight oats jar","r115":"shakshuka eggs skillet","r116":"croque madame sandwich","r117":"blinis eggs","r118":"ricotta toast strawberry","r119":"peanut butter banana toast","r120":"apple sauce cinnamon","r121":"beef tacos","r122":"chicken tacos","r123":"beef bean burrito","r124":"chicken quesadilla","r125":"chicken fajitas","r126":"cheeseburger fries","r127":"crispy chicken wings","r128":"chicken nuggets","r129":"margherita pizza","r130":"spaghetti bolognese","r131":"pesto pasta","r132":"mac and cheese","r133":"lasagna","r134":"shepherds pie","r135":"chili con carne","r136":"croque monsieur","r137":"chicken wrap","r138":"chicken kebab pita","r139":"chicken tikka masala","r140":"chicken coconut curry","r141":"fried rice","r142":"vegetable stir fry noodles","r143":"pad thai","r144":"chicken ramen bowl","r145":"salmon poke bowl","r146":"buddha bowl","r147":"chicken couscous","r148":"seafood paella","r149":"mushroom risotto","r150":"gnocchi tomato sauce","r151":"vegetarian chili beans","r152":"pho noodle soup","r153":"minestrone soup","r154":"pumpkin soup","r155":"leek quiche","r156":"tomato tart","r157":"buckwheat galette egg","r158":"vegetable frittata","r159":"meatballs tomato sauce","r160":"roast chicken potatoes","r161":"basque chicken peppers","r162":"beef patty mashed potatoes","r163":"chicken cordon bleu","r164":"fish and chips","r165":"teriyaki salmon rice","r166":"baked cod vegetables","r167":"garlic prawns","r168":"grilled chicken skewers","r169":"falafel wrap","r170":"caesar salad chicken","r171":"greek salad","r172":"quinoa salad","r173":"tuna sandwich","r174":"club sandwich","r175":"chicken enchiladas","r176":"baked pasta ham cheese","r177":"zucchini gratin","r178":"egg fried rice vegetables","r179":"sweet potato chorizo skillet","r180":"stuffed bell peppers rice","r181":"spinach dal curry","r182":"beef stir fry noodles","r183":"beef onion stir fry rice","r184":"french onion soup","r185":"spanish omelette","r186":"chicken tandoori naan","r187":"tartiflette potato cheese","r188":"spaghetti carbonara","r189":"ham mushroom pizza","r190":"tuna corn rice bowl","r191":"potato gratin","r192":"spaghetti garlic oil","r193":"sesame tofu stir fry","r194":"creamy turkey stew rice","r195":"baked eggs tomato","r196":"vegetable stir fry","r197":"burrito bowl avocado","r198":"miso soup tofu","r199":"grilled chicken pita","r200":"ham cheese omelette","r201":"sweet potato fries dip","r202":"ratatouille","r203":"coconut chicken rice spinach","r204":"fish tacos","r205":"grilled cheese sandwich","r206":"tomato mozzarella pasta"});
 
 const photoCache = {}; // evite de refaire la meme requete plusieurs fois pour le meme plat
 
@@ -1443,11 +1443,11 @@ function RecipeCard({ recipe, cheapestStore, onOpen, onReplace }) {
       </div>
       <div className="p-4">
         <h4 className="text-sm font-semibold text-slate-800 leading-snug mb-2 line-clamp-2">{recipe.name}</h4>
-        <div className="flex items-center gap-3 text-xs text-slate-400 mb-3">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-400 mb-3">
           <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {recipe.prepTime} min</span>
           <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3" /> {kcalFor(recipe)} kcal</span>
           <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
-            {fmtEuro(recipe.prices[cheapestStore])} <span className="text-slate-400 font-normal">/ portion</span>
+            {fmtEuro(recipe.prices[cheapestStore])} <span className="text-slate-400 font-normal">/ pers</span>
           </span>
         </div>
         <div className="flex items-center justify-between">
@@ -2016,7 +2016,7 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
           <h2 className="text-2xl font-bold text-slate-900">{plan.length} repas prêts, {data.adults + data.children} convive{data.adults + data.children > 1 ? 's' : ''}</h2>
           <p className="text-xs text-slate-400 mt-1 flex items-center gap-1"><Flame className="h-3 w-3 text-orange-500" /> ≈ {Math.round(plan.reduce((s, r) => s + kcalFor(r), 0) / Math.max(1, plan.length))} kcal / repas · par personne (estimation)</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {overBudget && (
             <button onClick={adjustToBudget} title="Remplacer des recettes pour rentrer dans le budget"
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 transition-colors">
@@ -2053,24 +2053,24 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
             <div className="rounded-2xl border border-slate-200/70 bg-white p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Macros / repas</p>
-              <p className="text-sm font-bold text-slate-800">{per.prot}g P · {per.gluc}g G · {per.lip}g L</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-800">{per.prot}g P · {per.gluc}g G · {per.lip}g L</p>
               <p className="text-[10px] text-slate-400 mt-0.5">≈ {per.kcal} kcal, par personne</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Variété</p>
-              <p className="text-sm font-bold text-slate-800">{distinct} plats différents</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-800">{distinct} plats différents</p>
               <p className="text-[10px] text-slate-400 mt-0.5">{varietyPct}% de diversité</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Anti-gaspi</p>
-              <p className="text-sm font-bold text-emerald-600">{ag.pct}%</p>
+              <p className="text-xs sm:text-sm font-bold text-emerald-600">{ag.pct}%</p>
               <p className="text-[10px] text-slate-400 mt-0.5">{ag.reused} ingrédient(s) réutilisé(s)</p>
             </div>
             <div className={`rounded-2xl border p-4 ${actualCost <= data.budget ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200/70 bg-white'}`}>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Défi budget</p>
               {actualCost <= data.budget
-                ? <p className="text-sm font-bold text-emerald-700">✅ Réussi &lt; {fmtEuro(data.budget)}</p>
-                : <p className="text-sm font-bold text-slate-800">{fmtEuro(actualCost - data.budget)} au-dessus</p>}
+                ? <p className="text-xs sm:text-sm font-bold text-emerald-700">✅ Réussi &lt; {fmtEuro(data.budget)}</p>
+                : <p className="text-xs sm:text-sm font-bold text-slate-800">{fmtEuro(actualCost - data.budget)} au-dessus</p>}
               <p className="text-[10px] text-slate-400 mt-0.5">semaine pour {data.adults + data.children} convive(s)</p>
             </div>
           </div>
@@ -2177,8 +2177,8 @@ function AccountButton({ onOpenView }) {
   const [menuOpen, setMenuOpen] = useState(false);
   if (!user) {
     return (
-      <button onClick={() => openAuth('login')} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-        <User className="h-4 w-4" /> Se connecter
+      <button onClick={() => openAuth('login')} title="Se connecter" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 sm:px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+        <User className="h-4 w-4" /> <span className="hidden sm:inline">Se connecter</span>
       </button>
     );
   }
@@ -2588,7 +2588,7 @@ export default function App() {
   const startWizard = () => { if (auth?.prefs) setData(d => ({ ...d, ...auth.prefs })); setScreen('wizard'); };
 
   return (
-    <div className={`min-h-screen bg-[#F8FAFC] text-slate-900 ${dark ? 'theme-dark' : ''}`} style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif" }}>
+    <div className={`min-h-screen overflow-x-hidden bg-[#F8FAFC] text-slate-900 ${dark ? 'theme-dark' : ''}`} style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif" }}>
       <style>{`
         @keyframes stepIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
@@ -2623,7 +2623,7 @@ export default function App() {
             <span className="font-bold text-slate-900">BudgetChef <span className="text-emerald-600">Pro</span></span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2.5">
-            {screen === 'wizard' && <span className="text-xs font-medium text-slate-400 mr-1">Étape {step + 1} / 4</span>}
+            {screen === 'wizard' && <span className="hidden sm:inline text-xs font-medium text-slate-400 mr-1">Étape {step + 1} / 4</span>}
             <button onClick={() => setExplore('browse')} title="Explorer les recettes" className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"><Search className="h-4 w-4" /></button>
             <button onClick={() => setExplore('fridge')} title="Cuisiner avec mon frigo" className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"><Refrigerator className="h-4 w-4" /></button>
             <button onClick={() => setDark(v => !v)} title={dark ? 'Mode clair' : 'Mode sombre'} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">{dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}</button>

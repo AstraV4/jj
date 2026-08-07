@@ -213,7 +213,7 @@ app.get('/api/photo', async (req, res) => {
   if (!key || !q) return res.json({ url: null });
   if (_photoCache.has(q)) return res.json({ url: _photoCache.get(q) });
   try {
-    const r = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=1&orientation=square`, { headers: { Authorization: key } });
+    const r = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q + ' food')}&per_page=1&orientation=landscape`, { headers: { Authorization: key } });
     if (!r.ok) throw new Error('pexels');
     const d = await r.json();
     const p = d.photos && d.photos[0];
