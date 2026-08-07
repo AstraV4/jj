@@ -1,12 +1,14 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   MapPin, ChevronRight, ChevronLeft, Users, Baby, Wallet, UtensilsCrossed,
   Flame, Microwave, CookingPot, Check, X, Clock, Repeat, Zap,
   ThermometerSun, Leaf, WheatOff, MilkOff, Moon, Ban, ShoppingCart,
   TrendingDown, RotateCcw, Download, Copy, ChefHat, Timer, Package,
   ArrowRight, Star, Sparkles, Dumbbell, HeartPulse, Rocket, Coffee, Sandwich,
-  Plus, Trash2, AlertCircle
+  Plus, Trash2, AlertCircle, Heart, User, LogOut, BookmarkCheck, History, Save,
+  Search, Refrigerator, Sun, MoonStar, Play, Pause, Minus, Filter, Store
 } from 'lucide-react';
+import { useAuth, VerifiedBanner } from './auth.jsx';
 
 /* =========================================================================
    BASE DE DONNEES SIMULEE
@@ -25,6 +27,13 @@ const SUPERMARKETS = [
   { id: 'grandfrais', name: 'Grand Frais', color: '#7AB61B' },
   { id: 'naturalia', name: 'Naturalia', color: '#4C7C3F' },
 ];
+
+// Affichage des logos d'enseignes : mets ce flag a true APRES avoir depose tes
+// fichiers dans public/logos/ (voir public/logos/README). Tant qu'il est a false,
+// on affiche le nom de l'enseigne (comportement actuel). Chaque enseigne pointe
+// vers /logos/<id>.png ; si le fichier manque, on retombe automatiquement sur le nom.
+const USE_STORE_LOGOS = false;
+SUPERMARKETS.forEach(s => { s.logo = `/logos/${s.id}.png`; });
 
 const EQUIPMENT = [
   { id: 'four', name: 'Four traditionnel', icon: ThermometerSun },
@@ -432,6 +441,99 @@ function ingredientQty(ing, people) {
   return fmtQty(rawAmount(spec, people), spec.u);
 }
 
+/* =========================================================================
+   EMOJI PAR ALIMENT
+   Regles par mot-cle (ordre du plus specifique au plus general), avec un
+   repli par rayon si aucun mot-cle ne correspond.
+   ========================================================================= */
+const EMOJI_RULES = [
+  [/b(?:œ|oe)uf|steak|agneau|veau/i, '🥩'],
+  [/œuf|oeuf/i, '🥚'],
+  [/poulet|volaille|dinde/i, '🍗'],
+  [/merguez|saucisse/i, '🌭'],
+  [/lardons|bacon|poitrine de porc|filet mignon|porc/i, '🥓'],
+  [/jambon/i, '🍖'],
+  [/saumon|poisson|cabillaud|thon|maquereau/i, '🐟'],
+  [/crevette|moule|fruits de mer|gambas|calamar/i, '🦐'],
+  [/tofu/i, '🌱'],
+  [/pomme(?:s)? de terre|patate/i, '🥔'],
+  [/lait/i, '🥛'],
+  [/beurre de cacahu|cacahu/i, '🥜'],
+  [/beurre/i, '🧈'],
+  [/parmesan|gruy|emmental|cheddar|mozzarella|feta|ch(?:è|e)vre|ricotta|fromage/i, '🧀'],
+  [/yaourt|yogourt/i, '🥛'],
+  [/houmous/i, '🥣'],
+  [/cr(?:è|e)me|b(?:é|e)chamel/i, '🥛'],
+  [/whey|prot(?:é|e)ine/i, '🥤'],
+  [/spaghetti|p(?:â|a)tes|lasagne|gnocchi/i, '🍝'],
+  [/nouille|udon|ramen|soba/i, '🍜'],
+  [/riz|quinoa|semoule|couscous|boulgour/i, '🍚'],
+  [/pois chiche|haricot|lentille|edamame|f(?:è|e)ve/i, '🫘'],
+  [/petits pois/i, '🟢'],
+  [/avoine|muesli|granola/i, '🥣'],
+  [/farine|chapelure|sarrasin|cro(?:û|u)ton/i, '🌾'],
+  [/tomate|coulis/i, '🍅'],
+  [/tortilla/i, '🌮'],
+  [/nori|sushi|maki/i, '🍙'],
+  [/bagel/i, '🥯'],
+  [/burger/i, '🍔'],
+  [/brioche|croissant/i, '🥐'],
+  [/pizza/i, '🍕'],
+  [/p(?:â|a)te à (?:pain|pizza|empanada|tarte)|p(?:â|a)te feuillet/i, '🥟'],
+  [/pain|muffin/i, '🍞'],
+  [/carotte/i, '🥕'],
+  [/poivron/i, '🫑'],
+  [/oignon|(?:é|e)chalote|ciboule/i, '🧅'],
+  [/\bail\b/i, '🧄'],
+  [/courgette|concombre/i, '🥒'],
+  [/aubergine/i, '🍆'],
+  [/champignon/i, '🍄'],
+  [/(?:é|e)pinard|salade|romaine|c(?:é|e)leri|persil|basilic|coriandre|aneth|thym|ciboulette/i, '🥬'],
+  [/brocoli/i, '🥦'],
+  [/courge|butternut|potiron|citrouille/i, '🎃'],
+  [/banane/i, '🍌'],
+  [/avocat/i, '🥑'],
+  [/citron/i, '🍋'],
+  [/pomme(?:s)?\b/i, '🍎'],
+  [/p(?:ê|e)che|abricot/i, '🍑'],
+  [/mangue/i, '🥭'],
+  [/fraise|fruits rouges|framboise|myrtille|cassis/i, '🍓'],
+  [/ma(?:ï|i)s/i, '🌽'],
+  [/miel/i, '🍯'],
+  [/cacao|chocolat/i, '🍫'],
+  [/huile d(?:'|’)?olive|olive/i, '🫒'],
+  [/coco|noix de coco/i, '🥥'],
+  [/amande|noix|noisette/i, '🥜'],
+  [/pruneau|raisin/i, '🍇'],
+  [/vin\b/i, '🍷'],
+  [/piment|paprika|harissa/i, '🌶️'],
+  [/chia|s(?:é|e)same|graine/i, '🌱'],
+  [/sauce|soja|nuoc|teriyaki|miso|p(?:â|a)te de curry|enchilada|pad tha(?:ï|i)/i, '🥫'],
+  [/curry|cumin|cannelle|muscade|safran|ras el hanout|za.?atar|(?:é|e)pice|tikka|paprika/i, '🧂'],
+  [/bouillon/i, '🍲'],
+  [/sucre/i, '🧂'],
+];
+const AISLE_EMOJI = {
+  'Fruits & Légumes': '🥗', 'Boucherie': '🥩', 'Frais': '🧀',
+  'Boulangerie': '🍞', 'Épicerie': '🛒', 'Surgelés': '🧊',
+};
+function emojiFor(name, aisle) {
+  for (const [re, e] of EMOJI_RULES) if (re.test(name)) return e;
+  return AISLE_EMOJI[aisle] || '🛒';
+}
+
+// Affiche le logo de l'enseigne si USE_STORE_LOGOS est actif et que le fichier existe,
+// sinon le nom. Repli automatique en cas d'image manquante (onError).
+function StoreLabel({ storeId, className = '', imgClass = 'h-4' }) {
+  const s = SUPERMARKETS.find(x => x.id === storeId);
+  const [imgError, setImgError] = React.useState(false);
+  if (!s) return null;
+  if (USE_STORE_LOGOS && !imgError) {
+    return <img src={s.logo} alt={s.name} title={s.name} onError={() => setImgError(true)} className={`inline-block w-auto object-contain align-middle ${imgClass} ${className}`} />;
+  }
+  return <span className={`capitalize ${className}`}>{s.name}</span>;
+}
+
 // Petit generateur pseudo-aleatoire deterministe (meme id = toujours le meme rendu, mais different d'un plat a l'autre)
 function seededRandom(seed) {
   let s = seed % 2147483647;
@@ -462,6 +564,37 @@ function shiftHue(hex, deg) {
 // ---------------------------------------------------------------------------
 const PEXELS_API_KEY = ''; // <- colle ta cle ici, entre les guillemets
 
+// Requetes photo choisies a la main (en anglais) pour obtenir de belles photos
+// professionnelles et PERTINENTES sur Pexels. Bien meilleur que de chercher avec
+// le nom francais du plat. Modifiable librement pour affiner une image.
+const PHOTO_QUERIES = {
+  r1: 'red lentil dahl bowl', r2: 'roast chicken vegetables', r3: 'spaghetti carbonara', r4: 'chickpea spinach curry',
+  r5: 'baked salmon lemon', r6: 'fried rice bowl', r7: 'chili con carne', r8: 'vegetable quiche',
+  r9: 'chicken wrap', r10: 'miso soup noodles', r11: 'beef tacos', r12: 'potato gratin',
+  r13: 'buddha bowl quinoa avocado', r14: 'chicken nuggets plate', r15: 'butternut squash soup', r16: 'vegetable omelette',
+  r17: 'oatmeal porridge banana', r18: 'scrambled eggs avocado toast', r19: 'banana pancakes', r20: 'yogurt granola bowl',
+  r21: 'berry smoothie bowl', r22: 'french toast cinnamon', r23: 'egg bacon muffin sandwich', r24: 'granola breakfast bowl',
+  r25: 'savory crepe ham cheese', r26: 'chia pudding coconut', r27: 'ricotta toast peach honey', r28: 'peanut butter banana smoothie',
+  r29: 'salmon poke bowl', r30: 'ratatouille dish', r31: 'beef bourguignon stew', r32: 'falafel hummus plate',
+  r33: 'pad thai shrimp', r34: 'mushroom risotto', r35: 'croque monsieur', r36: 'thai green curry chicken',
+  r37: 'caesar salad chicken', r38: 'ham mushroom pizza', r39: 'couscous meat vegetables', r40: 'cheeseburger fries',
+  r41: 'caramel pork rice', r42: 'vegetarian moussaka', r43: 'french onion soup', r44: 'seafood paella',
+  r45: 'tofu vegetable stir fry', r46: 'mango smoothie bowl', r47: 'muesli yogurt bowl', r48: 'croque monsieur',
+  r49: 'ricotta toast walnuts honey', r50: 'shakshuka eggs', r51: 'falafel hummus plate', r52: 'salmon poke bowl',
+  r53: 'ratatouille dish', r54: 'chicken tikka masala', r55: 'pad thai shrimp', r56: 'beef burger',
+  r57: 'margherita pizza', r58: 'chicken couscous', r59: 'caesar salad', r60: 'vegetarian chili beans',
+  r61: 'buckwheat galette ham cheese', r62: 'apple crumble dessert', r63: 'korean bibimbap', r64: 'thai green curry chicken',
+  r65: 'minestrone soup', r66: 'sushi maki rolls', r67: 'french toast cinnamon', r68: 'vegetarian hummus wrap',
+  r69: 'mushroom risotto', r70: 'beef bourguignon stew', r71: 'greek salad', r72: 'chocolate overnight oats',
+  r73: 'thin crepes plate', r74: 'crunchy granola bowl', r75: 'smoked salmon bagel', r76: 'berry chia pudding',
+  r77: 'peanut butter banana toast', r78: 'goat cheese omelette', r79: 'chocolate protein porridge', r80: 'brioche french toast berries',
+  r81: 'chicken enchiladas', r82: 'seafood paella', r83: 'pork ramen bowl', r84: 'lamb tagine prunes',
+  r85: 'zaatar manakish flatbread', r86: 'beef pho soup', r87: 'lasagna bolognese', r88: 'spanish tortilla',
+  r89: 'basque chicken peppers', r90: 'mussels marinara pot', r91: 'chicken curry rice', r92: 'nasi goreng',
+  r93: 'eggplant curry indian', r94: 'teriyaki salmon rice', r95: 'beef empanadas', r96: 'moroccan spiced chicken',
+  r97: 'gnocchi tomato basil', r98: 'coconut shrimp curry', r99: 'general tso chicken', r100: 'lentil salad roasted vegetables',
+};
+
 const photoCache = {}; // evite de refaire la meme requete plusieurs fois pour le meme plat
 
 function useDishPhoto(recipe) {
@@ -471,7 +604,7 @@ function useDishPhoto(recipe) {
   React.useEffect(() => {
     if (!PEXELS_API_KEY || photoCache[recipe.id] !== undefined) { if (photoCache[recipe.id]) setUrl(photoCache[recipe.id]); return; }
     let cancelled = false;
-    const primary = recipe.photoQuery || recipe.name;
+    const primary = PHOTO_QUERIES[recipe.id] || recipe.photoQuery || recipe.name;
     const fallback = primary.split(/\s+/).slice(0, 2).join(' ') + ' food'; // repli generique si la recherche precise ne donne rien
     const search = (q) => fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=1&orientation=square`, {
       headers: { Authorization: PEXELS_API_KEY }
@@ -566,7 +699,8 @@ function scoreRecipe(recipe, data, budgetPerPortion) {
 // Construit un menu : respecte equipement/regimes (obligatoires), evite les aliments detestes,
 // favorise (sans jamais garantir) les recettes qui correspondent aux objectifs/preferences ET AU BUDGET,
 // et melange aleatoirement a chaque generation pour ne jamais proposer toujours le meme menu.
-function buildPlan(data) {
+function buildPlan(data, cookedIds = []) {
+  const cooked = new Set(cookedIds);
   const mealTypes = data.mealTypes.length ? data.mealTypes : ['dejeuner', 'diner'];
   const plan = [];
   const totalMeals = data.days * mealTypes.length;
@@ -590,7 +724,9 @@ function buildPlan(data) {
 
     // Melange puis trie par score (preferences + objectifs + respect du budget) — les ex-aequo restent
     // donc dans un ordre different a chaque fois
-    const ranked = shuffle(pool).sort((a, b) => scoreRecipe(b, data, budgetPerPortion) - scoreRecipe(a, data, budgetPerPortion));
+    const ranked = shuffle(pool).sort((a, b) =>
+      (scoreRecipe(b, data, budgetPerPortion) - (cooked.has(b.id) ? 4 : 0)) -
+      (scoreRecipe(a, data, budgetPerPortion) - (cooked.has(a.id) ? 4 : 0)));
 
     // Tire "days" recettes : on privilegie celles pas encore utilisees ailleurs dans la semaine,
     // et on n'autorise une repetition qu'en tout dernier recours (pool entierement epuise).
@@ -729,16 +865,164 @@ const DEPARTEMENTS = {
 // Les 4 enseignes ayant la plus large couverture nationale en France, tous departements confondus
 const CHAINS_NATIONWIDE = ['carrefour', 'leclerc', 'intermarche', 'lidl'];
 
+// Enseignes fortement présentes dans certaines zones (pour une estimation de proximité plus crédible).
+const REGION_STRONG = {
+  cora: ['54', '57', '67', '68', '88', '51', '52', '55', '08', '02', '59', '60', '10'],
+  monoprix: ['75', '92', '93', '94', '69', '13', '33', '31', '06', '44', '67', '34'],
+  franprix: ['75', '92', '93', '94', '91', '95', '77', '78'],
+  naturalia: ['75', '92', '93', '94', '69', '33', '13'],
+  grandfrais: ['69', '38', '01', '42', '13', '83', '06', '31', '33', '44', '34'],
+  casino: ['38', '42', '69', '13', '06', '83', '84', '26'],
+};
+// Estimation INDICATIVE des enseignes proches d'un code postal (déterministe, pas une vraie géoloc).
+// Chaque enseigne reçoit une distance simulée stable ; les enseignes de la région et les grandes
+// chaînes nationales sont rapprochées. Sert à proposer un point de départ pertinent à l'utilisateur.
+function nearbyStores(cp) {
+  const dept = cp.slice(0, 2);
+  return SUPERMARKETS.map(s => {
+    const rnd = seededRandom(hashId(cp + '-' + s.id))();
+    let dist = 0.4 + rnd * 7.6;
+    if ((REGION_STRONG[s.id] || []).includes(dept)) dist *= 0.35;
+    if (CHAINS_NATIONWIDE.includes(s.id)) dist *= 0.8;
+    if (s.id === 'aldi') dist *= 0.85;
+    return { ...s, distance: Math.max(0.3, Math.round(dist * 10) / 10) };
+  }).sort((a, b) => a.distance - b.distance);
+}
+
+// Calories estimées par portion (indicatif), déterministe par recette.
+function kcalFor(recipe) {
+  const base = recipe.mealType.includes('petitdej') && !recipe.mealType.includes('dejeuner') ? 380
+    : recipe.mealType.includes('diner') && !recipe.mealType.includes('dejeuner') ? 600 : 640;
+  let k = base;
+  if (recipe.goals.includes('healthy')) k -= 130;
+  if (recipe.goals.includes('protein')) k += 70;
+  if (recipe.goals.includes('gourmand')) k += 110;
+  k += (hashId(recipe.id) % 90) - 45;
+  return Math.max(180, Math.round(k / 10) * 10);
+}
+
+// Ingrédients de saison par mois (mots-clés). Sert à mettre en avant les recettes de saison.
+const SEASON = {
+  0: ['courge', 'butternut', 'poireau', 'chou', 'orange', 'pomme', 'carotte', 'panais'],
+  1: ['courge', 'poireau', 'chou', 'orange', 'pomme', 'carotte', 'endive'],
+  2: ['poireau', 'épinard', 'radis', 'carotte', 'chou', 'pomme'],
+  3: ['épinard', 'radis', 'asperge', 'petits pois', 'fraise', 'carotte'],
+  4: ['asperge', 'fraise', 'radis', 'petits pois', 'courgette', 'concombre'],
+  5: ['fraise', 'courgette', 'tomate', 'concombre', 'poivron', 'aubergine', 'pêche', 'fruits rouges'],
+  6: ['tomate', 'courgette', 'aubergine', 'poivron', 'pêche', 'melon', 'fruits rouges', 'concombre'],
+  7: ['tomate', 'courgette', 'aubergine', 'poivron', 'pêche', 'melon', 'fruits rouges', 'maïs'],
+  8: ['tomate', 'courgette', 'aubergine', 'raisin', 'pomme', 'champignon', 'poivron'],
+  9: ['courge', 'champignon', 'pomme', 'raisin', 'poireau', 'chou', 'butternut'],
+  10: ['courge', 'butternut', 'champignon', 'poireau', 'chou', 'pomme', 'carotte'],
+  11: ['courge', 'butternut', 'poireau', 'chou', 'orange', 'pomme', 'carotte'],
+};
+function isSeasonal(recipe) {
+  const kw = SEASON[new Date().getMonth()] || [];
+  return recipe.ingredients.some(ing => { const n = ing.n.toLowerCase(); return kw.some(k => n.includes(k)); });
+}
+
+/* ---- Niveau de difficulté (estimé depuis le temps, le nb d'étapes, l'équipement) ---- */
+function difficultyFor(recipe) {
+  const steps = recipe.steps ? recipe.steps.length : 3;
+  let score = 0;
+  if (recipe.prepTime > 40) score += 2; else if (recipe.prepTime > 20) score += 1;
+  if (steps >= 5) score += 1;
+  if (recipe.equipment.includes('thermomix')) score -= 1;
+  if (recipe.equipment.length >= 2) score += 1;
+  if (score <= 0) return { label: 'Facile', level: 1, color: '#10B981' };
+  if (score === 1) return { label: 'Facile', level: 1, color: '#10B981' };
+  if (score === 2) return { label: 'Intermédiaire', level: 2, color: '#F59E0B' };
+  return { label: 'Élaboré', level: 3, color: '#EF4444' };
+}
+
+/* ---- Macros estimées par portion (grammes), déterministe depuis kcal + objectifs ---- */
+function macrosFor(recipe) {
+  const kcal = kcalFor(recipe);
+  let pPct = 0.20, fPct = 0.30; // protéines / lipides par défaut (part des kcal)
+  if (recipe.goals.includes('protein')) pPct = 0.32;
+  if (recipe.goals.includes('healthy')) fPct = 0.25;
+  if (recipe.goals.includes('gourmand')) fPct = 0.38;
+  const cPct = Math.max(0.2, 1 - pPct - fPct);
+  return {
+    kcal,
+    prot: Math.round((kcal * pPct) / 4),   // 4 kcal/g
+    gluc: Math.round((kcal * cPct) / 4),
+    lip: Math.round((kcal * fPct) / 9),    // 9 kcal/g
+  };
+}
+
+/* ---- Substitutions d'ingrédients (par mot-clé) ---- */
+const SUBS = {
+  'beurre': 'huile d\'olive ou margarine', 'crème fraîche': 'yaourt grec ou crème de soja',
+  'lait': 'lait végétal (avoine, amande)', 'lardons': 'dés de tofu fumé ou allumettes de dinde',
+  'bœuf haché': 'haché de dinde, de veau ou de soja', 'parmesan': 'levure maltée ou grana',
+  'crème': 'crème de soja ou fromage blanc', 'œufs': 'compote/banane (pâtisserie) ou tofu soyeux',
+  'sucre': 'miel, sirop d\'érable ou sucre de coco', 'farine': 'farine de sarrasin ou de riz (sans gluten)',
+  'riz': 'quinoa, boulgour ou semoule', 'pâtes': 'pâtes complètes ou de légumineuses',
+  'pois chiches': 'haricots blancs ou lentilles', 'poulet': 'dinde, tofu ferme ou pois chiches',
+  'saumon': 'truite, maquereau ou filet de cabillaud', 'citron': 'vinaigre ou citron vert',
+  'basilic': 'persil ou coriandre', 'miel': 'sirop d\'agave ou d\'érable',
+  'lait de coco': 'crème de soja + arôme coco', 'yaourt grec': 'skyr ou fromage blanc',
+  'chapelure': 'flocons d\'avoine mixés', 'tortillas': 'galettes de blé ou feuilles de riz',
+};
+function substituteFor(name) {
+  const n = name.toLowerCase();
+  for (const k in SUBS) if (n.includes(k)) return SUBS[k];
+  return null;
+}
+
+/* ---- Allergènes détectés dans une recette (pour filtrer finement) ---- */
+const ALLERGENS = {
+  gluten: /farine|pâtes|spaghetti|pain|chapelure|couscous|semoule|nouille|bagel|brioche|tortilla|lasagne|gnocchi|udon|ramen|sarrasin|muffin|crouton|galette|pizza|wrap|bulgur|boulgour/i,
+  lactose: /lait|crème|beurre|fromage|parmesan|gruy|emmental|cheddar|mozzarella|feta|ricotta|yaourt|béchamel|chèvre/i,
+  oeuf: /œuf|oeuf/i,
+  fruits_a_coque: /amande|noix|noisette|cajou|pistache/i,
+  arachide: /cacahu|arachide/i,
+  poisson: /saumon|poisson|cabillaud|thon|truite|maquereau/i,
+  crustaces: /crevette|gambas|langoustine|crustac/i,
+  mollusques: /moule|calamar|huître|palourde|fruits de mer/i,
+  soja: /soja|tofu|edamame|miso|teriyaki/i,
+  sesame: /sésame|tahin/i,
+};
+const ALLERGEN_LABELS = { gluten: 'Gluten', lactose: 'Lactose', oeuf: 'Œuf', fruits_a_coque: 'Fruits à coque', arachide: 'Arachide', poisson: 'Poisson', crustaces: 'Crustacés', mollusques: 'Mollusques', soja: 'Soja', sesame: 'Sésame' };
+function allergensOf(recipe) {
+  const names = recipe.ingredients.map(i => i.n).join(' ');
+  return Object.keys(ALLERGENS).filter(a => ALLERGENS[a].test(names));
+}
+
+/* ---- Conditionnements réels : arrondir une quantité à l'unité vendue ---- */
+function packagingNote(name, amount, unit) {
+  const n = name.toLowerCase();
+  if (n.includes('œuf') || n.includes('oeuf')) { const boxes = Math.ceil(amount / 6); return `→ ${boxes} boîte${boxes > 1 ? 's' : ''} de 6`; }
+  if (unit === 'g' && (n.includes('riz') || n.includes('pâtes') || n.includes('lentille') || n.includes('farine') || n.includes('quinoa'))) { if (amount <= 500) return '→ 1 paquet (500 g)'; return `→ ${Math.ceil(amount / 500)} paquets (500 g)`; }
+  if (n.includes('lait') && unit === 'ml') { const b = Math.ceil(amount / 1000); return `→ ${b} brique${b > 1 ? 's' : ''} (1 L)`; }
+  return null;
+}
+
+/* ---- Score anti-gaspi : ingrédients réutilisés sur plusieurs recettes du menu ---- */
+function antiGaspiScore(recipes) {
+  const count = {};
+  recipes.forEach(r => r.ingredients.forEach(i => { count[i.n] = (count[i.n] || 0) + 1; }));
+  const reused = Object.values(count).filter(c => c >= 2).length;
+  const distinct = Object.keys(count).length || 1;
+  const pct = Math.min(100, Math.round((reused / distinct) * 260));
+  return { pct, reused };
+}
+
 function Step1({ data, setData, onNext }) {
   const toggleStore = (id) => {
     setData(d => ({ ...d, stores: d.stores.includes(id) ? d.stores.filter(s => s !== id) : [...d.stores, id] }));
   };
-  const dept = /^\d{5}$/.test(data.location.trim()) ? DEPARTEMENTS[data.location.trim().slice(0, 2)] : null;
+  const cp = data.location.trim();
+  const isCP = /^\d{5}$/.test(cp);
+  const dept = isCP ? DEPARTEMENTS[cp.slice(0, 2)] : null;
+  const near = isCP ? nearbyStores(cp) : null;
+  const pickNearest = () => setData(d => ({ ...d, stores: [...new Set([...d.stores, ...near.slice(0, 3).map(s => s.id)])] }));
   const applySuggestion = () => setData(d => ({ ...d, stores: [...new Set([...d.stores, ...CHAINS_NATIONWIDE])] }));
   return (
     <StepShell
       eyebrow="Étape 1 sur 4" title="Où fais-tu tes courses ?"
-      sub="Choisis ta zone et les enseignes que tu fréquentes, pour comparer les prix au plus juste."
+      sub="Entre ton code postal pour voir les enseignes les plus proches, puis choisis celles que tu fréquentes."
       onNext={onNext} nextDisabled={data.stores.length === 0}
     >
       <div className="relative mb-3">
@@ -746,22 +1030,50 @@ function Step1({ data, setData, onNext }) {
         <input
           value={data.location}
           onChange={e => setData(d => ({ ...d, location: e.target.value }))}
-          placeholder="Ville ou code postal (ex: Lyon, 69003)"
+          placeholder="Code postal (ex : 69003) ou ville"
           className="w-full rounded-xl border border-slate-200 bg-white py-3.5 pl-11 pr-4 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15"
         />
       </div>
-      {dept && (
-        <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 mb-6 animate-[stepIn_0.25s_ease-out]">
-          <p className="text-xs text-emerald-800"><b className="font-semibold">{dept}</b> — voici les enseignes les plus répandues en France, tu peux ajuster ensuite.</p>
-          <button onClick={applySuggestion} className="flex-none text-xs font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-900">Ajouter</button>
+
+      {isCP ? (
+        <div className="mb-2">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-emerald-600" /> LES PLUS PROCHES DE {dept ? dept.toUpperCase() : cp} ({cp})</p>
+            <button onClick={pickNearest} className="flex-none text-xs font-semibold text-emerald-700 hover:text-emerald-900">Choisir les 3 + proches</button>
+          </div>
+          <div className="space-y-2">
+            {near.map((s, i) => {
+              const active = data.stores.includes(s.id);
+              return (
+                <button key={s.id} onClick={() => toggleStore(s.id)}
+                  className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all ${active ? 'border-emerald-300 bg-emerald-50/60' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                  <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-md border transition-all ${active ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                    {active && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                  </span>
+                  <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: s.color }} />
+                  <span className="flex-1 text-sm font-medium text-slate-800">{s.name}</span>
+                  {i === 0 && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Le + proche</span>}
+                  <span className="flex-none text-xs font-semibold text-slate-500">≈ {s.distance.toString().replace('.', ',')} km</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-[11px] text-slate-400">Distances estimées à titre indicatif selon ta zone (la géolocalisation exacte des magasins nécessite un service de localisation sur le site en ligne).</p>
         </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 mb-6">
+            <p className="text-xs text-slate-500">Astuce : saisis ton <b className="text-slate-700">code postal</b> pour voir les enseignes les plus proches classées par distance.</p>
+            <button onClick={applySuggestion} className="flex-none text-xs font-semibold text-emerald-700 hover:text-emerald-900">Enseignes courantes</button>
+          </div>
+          <p className="text-xs font-semibold text-slate-500 mb-3">TOUTES LES ENSEIGNES</p>
+          <div className="grid grid-cols-3 sm:grid-cols-3 gap-3">
+            {SUPERMARKETS.map(s => (
+              <Badge key={s.id} active={data.stores.includes(s.id)} onClick={() => toggleStore(s.id)} label={s.name} dotColor={s.color} />
+            ))}
+          </div>
+        </>
       )}
-      <p className="text-xs font-semibold text-slate-500 mb-3">SUPERMARCHÉS À PROXIMITÉ</p>
-      <div className="grid grid-cols-3 sm:grid-cols-3 gap-3">
-        {SUPERMARKETS.map(s => (
-          <Badge key={s.id} active={data.stores.includes(s.id)} onClick={() => toggleStore(s.id)} label={s.name} dotColor={s.color} />
-        ))}
-      </div>
     </StepShell>
   );
 }
@@ -984,7 +1296,7 @@ function SavingsGauge({ budget, actual, classic }) {
               <span className="text-xs font-semibold text-emerald-700">Dans ton budget</span>
             </div>
             <p className="text-2xl font-bold text-slate-900 mb-1">Tu économises {fmtEuro(savings)}</p>
-            <p className="text-sm text-slate-500">par rapport à un panier classique dans une seule grande enseigne, en répartissant tes achats sur les enseignes que tu as sélectionnées.</p>
+            <p className="text-sm text-slate-500">par rapport au prix moyen des enseignes, en achetant chaque produit là où il est le moins cher parmi celles que tu as sélectionnées.</p>
           </>
         )}
       </div>
@@ -994,11 +1306,14 @@ function SavingsGauge({ budget, actual, classic }) {
 
 function RecipeCard({ recipe, cheapestStore, onOpen, onReplace }) {
   const [flipping, setFlipping] = useState(false);
+  const { isSaved, toggleSaved } = useAuth();
+  const saved = isSaved(recipe.id);
   const handleReplace = (e) => {
     e.stopPropagation();
     setFlipping(true);
     setTimeout(() => { onReplace(); setFlipping(false); }, 280);
   };
+  const handleSave = (e) => { e.stopPropagation(); toggleSaved(recipe.id); };
   return (
     <div
       onClick={onOpen}
@@ -1016,17 +1331,28 @@ function RecipeCard({ recipe, cheapestStore, onOpen, onReplace }) {
         >
           <RotateCcw className="h-3.5 w-3.5" />
         </button>
+        <button
+          onClick={handleSave}
+          title={saved ? 'Retirer des favoris' : 'Sauvegarder cette recette'}
+          className={`absolute top-2.5 left-2.5 flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-all ${saved ? 'bg-white text-rose-500 opacity-100' : 'bg-white/90 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-rose-500'}`}
+        >
+          <Heart className="h-3.5 w-3.5" fill={saved ? 'currentColor' : 'none'} />
+        </button>
+        {isSeasonal(recipe) && (
+          <span className="absolute bottom-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 shadow-sm"><Leaf className="h-3 w-3" /> De saison</span>
+        )}
       </div>
       <div className="p-4">
         <h4 className="text-sm font-semibold text-slate-800 leading-snug mb-2 line-clamp-2">{recipe.name}</h4>
         <div className="flex items-center gap-3 text-xs text-slate-400 mb-3">
           <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {recipe.prepTime} min</span>
+          <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3" /> {kcalFor(recipe)} kcal</span>
           <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
             {fmtEuro(recipe.prices[cheapestStore])} <span className="text-slate-400 font-normal">/ portion</span>
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-500 capitalize">{SUPERMARKETS.find(s => s.id === cheapestStore)?.name}</span>
+          <span className="rounded-md bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-500"><StoreLabel storeId={cheapestStore} imgClass="h-3.5" /></span>
           <ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
         </div>
       </div>
@@ -1034,12 +1360,54 @@ function RecipeCard({ recipe, cheapestStore, onOpen, onReplace }) {
   );
 }
 
+function IngredientRow({ ing, qty }) {
+  const [openSub, setOpenSub] = useState(false);
+  const sub = substituteFor(ing.n);
+  return (
+    <li className="rounded-lg bg-slate-50/70 px-3 py-2 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2.5 min-w-0 text-slate-700">
+          <span className="flex-none">{emojiFor(ing.n, ing.a)}</span> <span className="truncate">{ing.n}</span>
+          {sub && <button onClick={() => setOpenSub(o => !o)} title="Voir une substitution" className="flex-none text-slate-300 hover:text-emerald-600"><Repeat className="h-3.5 w-3.5" /></button>}
+        </span>
+        <span className="flex-none font-semibold text-slate-900">{qty}</span>
+      </div>
+      {openSub && sub && <p className="mt-1.5 text-xs text-emerald-700 flex items-start gap-1.5"><Repeat className="h-3 w-3 mt-0.5 flex-none" /> Pas de {ing.n.toLowerCase()} ? Remplace par {sub}.</p>}
+    </li>
+  );
+}
+
+function RatingAndCooked({ recipe }) {
+  const { ratingOf, setRating, isCooked, toggleCooked } = useAuth();
+  const rating = ratingOf(recipe.id);
+  const cooked = isCooked(recipe.id);
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 p-3 mb-5 animate-[fadeSlideIn_0.4s_ease-out_0.14s_both]">
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-slate-500 mr-1">Ma note</span>
+        {[1, 2, 3, 4, 5].map(n => (
+          <button key={n} onClick={() => setRating(recipe.id, n === rating ? 0 : n)} className="p-0.5">
+            <Star className="h-4 w-4" fill={n <= rating ? '#F59E0B' : 'none'} color={n <= rating ? '#F59E0B' : '#CBD5E1'} />
+          </button>
+        ))}
+      </div>
+      <button onClick={() => toggleCooked(recipe.id)} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${cooked ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+        <Check className="h-3.5 w-3.5" /> {cooked ? 'Déjà cuisiné' : 'Marquer cuisiné'}
+      </button>
+    </div>
+  );
+}
+
 function RecipeModal({ recipe, cheapestStore, onClose, people = 1, alternatives = [], onReplaceWith, cheapestStoreFor }) {
   const [mode, setMode] = useState('detail'); // detail | swap
+  const [portions, setPortions] = useState(Math.max(1, Math.round(people)));
+  const [cook, setCook] = useState(false);
+  const { isSaved, toggleSaved } = useAuth();
   // Quand on ouvre une autre recette, on revient toujours a la vue detail
-  React.useEffect(() => { setMode('detail'); }, [recipe && recipe.id]);
+  React.useEffect(() => { setMode('detail'); setCook(false); setPortions(Math.max(1, Math.round(people))); }, [recipe && recipe.id]);
   if (!recipe) return null;
-  const portions = Math.max(1, Math.round(people));
+  const saved = isSaved(recipe.id);
+  const unitPrice = cheapestStore ? recipe.prices[cheapestStore] : cheapestPrice(recipe, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-[fadeIn_0.25s_ease-out]" onClick={onClose}>
@@ -1108,40 +1476,59 @@ function RecipeModal({ recipe, cheapestStore, onClose, people = 1, alternatives 
 
             <div className="flex flex-wrap items-center gap-2 mb-5 animate-[fadeSlideIn_0.4s_ease-out_0.1s_both]">
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500"><Clock className="h-3 w-3" /> {recipe.prepTime} min</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-600"><Flame className="h-3 w-3" /> {kcalFor(recipe)} kcal</span>
+              {(() => { const d = difficultyFor(recipe); return <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: `${d.color}1a`, color: d.color }}><Star className="h-3 w-3" /> {d.label}</span>; })()}
               {recipe.equipment.map(eq => {
                 const e = EQUIPMENT.find(x => x.id === eq);
                 return <span key={eq} className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500"><e.icon className="h-3 w-3" /> {e.name}</span>;
               })}
             </div>
 
-            {/* Bouton pour changer de recette a cet emplacement du menu */}
-            {onReplaceWith && (
+            {/* Actions : changer de recette + sauvegarder en favori */}
+            <div className="flex gap-2 mb-5 animate-[fadeSlideIn_0.4s_ease-out_0.12s_both]">
+              {onReplaceWith && (
+                <button
+                  onClick={() => setMode('swap')}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50/50 transition-all"
+                >
+                  <RotateCcw className="h-4 w-4" /> Changer ce repas
+                </button>
+              )}
               <button
-                onClick={() => setMode('swap')}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50/50 transition-all mb-5 animate-[fadeSlideIn_0.4s_ease-out_0.12s_both]"
+                onClick={() => toggleSaved(recipe.id)}
+                title={saved ? 'Retirer des favoris' : 'Sauvegarder'}
+                className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-all ${saved ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-slate-200 bg-white text-slate-700 hover:border-rose-200 hover:text-rose-600'} ${onReplaceWith ? '' : 'flex-1'}`}
               >
-                <RotateCcw className="h-4 w-4" /> Changer ce repas
+                <Heart className="h-4 w-4" fill={saved ? 'currentColor' : 'none'} /> {saved ? 'Sauvegardé' : 'Sauvegarder'}
               </button>
-            )}
+            </div>
+
+            <RatingAndCooked recipe={recipe} />
+
+            {(() => { const m = macrosFor(recipe); const M = ({ v, l, c }) => (<div className="flex-1 rounded-xl bg-slate-50 py-2 text-center"><div className="text-sm font-bold" style={{ color: c }}>{v} g</div><div className="text-[10px] uppercase tracking-wide text-slate-400">{l}</div></div>); return (
+              <div className="flex gap-2 mb-5 animate-[fadeSlideIn_0.4s_ease-out_0.16s_both]">
+                <div className="flex-1 rounded-xl bg-orange-50 py-2 text-center"><div className="text-sm font-bold text-orange-600">{m.kcal * portions}</div><div className="text-[10px] uppercase tracking-wide text-orange-400">kcal ({portions}p)</div></div>
+                <M v={m.prot * portions} l="Protéines" c="#0EA5E9" />
+                <M v={m.gluc * portions} l="Glucides" c="#F59E0B" />
+                <M v={m.lip * portions} l="Lipides" c="#EF4444" />
+              </div>
+            ); })()}
 
             <div className="rounded-2xl bg-emerald-50/80 p-4 mb-5 flex items-center justify-between animate-[fadeSlideIn_0.4s_ease-out_0.15s_both]">
-              <span className="text-sm text-emerald-800">Meilleur prix chez <b>{SUPERMARKETS.find(s => s.id === cheapestStore)?.name}</b></span>
-              <span className="text-lg font-bold text-emerald-700">{fmtEuro(recipe.prices[cheapestStore])}</span>
+              <span className="text-sm text-emerald-800">Meilleur prix chez <b><StoreLabel storeId={cheapestStore} imgClass="h-4" /></b></span>
+              <span className="text-lg font-bold text-emerald-700">{fmtEuro(unitPrice * portions)}<span className="text-xs font-normal text-emerald-600/70"> · {fmtEuro(unitPrice)}/pers</span></span>
             </div>
 
             <div className="flex items-center justify-between mb-3 animate-[fadeSlideIn_0.4s_ease-out_0.18s_both]">
               <p className="text-xs font-semibold text-slate-500">INGRÉDIENTS</p>
-              <span className="text-[11px] font-medium text-slate-400">pour {portions} personne{portions > 1 ? 's' : ''}</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPortions(p => Math.max(1, p - 1))} className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"><Minus className="h-3 w-3" /></button>
+                <span className="text-xs font-semibold text-slate-700 w-16 text-center">{portions} pers.</span>
+                <button onClick={() => setPortions(p => Math.min(12, p + 1))} className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"><Plus className="h-3 w-3" /></button>
+              </div>
             </div>
             <ul className="space-y-1.5 mb-4 animate-[fadeSlideIn_0.4s_ease-out_0.2s_both]">
-              {recipe.ingredients.map((ing, i) => (
-                <li key={i} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50/70 px-3 py-2 text-sm">
-                  <span className="flex items-center gap-2.5 min-w-0 text-slate-700">
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300 flex-none" /> <span className="truncate">{ing.n}</span>
-                  </span>
-                  <span className="flex-none font-semibold text-slate-900">{ingredientQty(ing, people)}</span>
-                </li>
-              ))}
+              {recipe.ingredients.map((ing, i) => <IngredientRow key={i} ing={ing} qty={ingredientQty(ing, portions)} />)}
             </ul>
 
             {recipe.brandTip && (
@@ -1153,7 +1540,10 @@ function RecipeModal({ recipe, cheapestStore, onClose, people = 1, alternatives 
 
             {recipe.steps && (
               <div className="animate-[fadeSlideIn_0.4s_ease-out_0.3s_both]">
-                <p className="text-xs font-semibold text-slate-500 mb-3">ÉTAPES DE PRÉPARATION</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-slate-500">ÉTAPES DE PRÉPARATION</p>
+                  <button onClick={() => setCook(true)} className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"><Play className="h-3 w-3" /> Mode cuisine</button>
+                </div>
                 <ol className="space-y-3 mb-6">
                   {recipe.steps.map((step, i) => (
                     <li key={i} className="flex items-start gap-3 text-sm text-slate-600">
@@ -1169,7 +1559,7 @@ function RecipeModal({ recipe, cheapestStore, onClose, people = 1, alternatives 
             <div className="space-y-2 animate-[fadeSlideIn_0.4s_ease-out_0.4s_both]">
               {Object.entries(recipe.prices).sort((a,b) => a[1]-b[1]).map(([store, price]) => (
                 <div key={store} className="flex items-center gap-3">
-                  <span className="w-24 text-xs text-slate-500 capitalize">{SUPERMARKETS.find(s => s.id === store)?.name}</span>
+                  <span className="w-24 text-xs text-slate-500"><StoreLabel storeId={store} imgClass="h-3.5" /></span>
                   <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
                     <div className="h-full rounded-full bg-emerald-400 transition-all duration-700 ease-out" style={{ width: `${(price / Math.max(...Object.values(recipe.prices))) * 100}%` }} />
                   </div>
@@ -1181,6 +1571,7 @@ function RecipeModal({ recipe, cheapestStore, onClose, people = 1, alternatives 
         </div>
         )}
       </div>
+      {cook && <CookMode recipe={recipe} onClose={() => setCook(false)} />}
     </div>
   );
 }
@@ -1205,115 +1596,216 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
     return map;
   }, [recipes, people]);
   const [checked, setChecked] = useState({});
+  const [owned, setOwned] = useState({});      // garde-manger : "j'ai déjà"
+  const [byStore, setByStore] = useState(false); // regroupement par magasin
+  const [extras, setExtras] = useState([]);     // articles ajoutés à la main
+  const [newItem, setNewItem] = useState('');
   const toggle = (name) => setChecked(c => ({ ...c, [name]: !c[name] }));
+  const toggleOwned = (name) => setOwned(o => ({ ...o, [name]: !o[name] }));
   const [copied, setCopied] = useState(false);
   const allItems = Object.values(grouped).flat();
-  const totalCost = recipes.reduce((sum, r) => sum + r.prices[cheapestStoreFor(r)] * people, 0);
+  const totalCost = allItems.filter(i => !owned[i.name]).reduce((s, i) => s + i.estPrice, 0);
 
-  // Texte partageable de la liste, reutilise par Copier et WhatsApp
+  const storeGroups = {};
+  allItems.forEach(i => { (storeGroups[i.store] = storeGroups[i.store] || []).push(i); });
+  const storeSubtotal = (items) => items.filter(i => !owned[i.name]).reduce((s, i) => s + i.estPrice, 0);
+
+  const addExtra = () => { const v = newItem.trim(); if (!v) return; setExtras(e => [...e, { id: Date.now(), name: v }]); setNewItem(''); };
+
+  // Comparatif 1 seul magasin vs multi-magasins optimisé
+  const usedStores = [...new Set(recipes.map(r => cheapestStoreFor(r)))];
+  const fullMulti = allItems.reduce((s, i) => s + i.estPrice, 0);
+  const singleBest = usedStores.length ? Math.min(...usedStores.map(st => recipes.reduce((s, r) => s + r.prices[st] * people, 0))) : fullMulti;
+  const saveSplit = Math.max(0, singleBest - fullMulti);
+
+  // Partage temps réel de la liste (par code)
+  const { createShared, fetchShared, putShared, user } = useAuth();
+  const [shareCode, setShareCode] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [sharedItems, setSharedItems] = useState(null);
+  const startShare = async () => {
+    const items = allItems.filter(i => !owned[i.name]).map(i => ({ name: i.name, qty: i.qty })).concat(extras.map(e => ({ name: e.name })));
+    const code = await createShared(items);
+    if (code) { setShareCode(code); setJoinCode(code); }
+  };
+  useEffect(() => {
+    if (!joinCode) return;
+    let stop = false;
+    const tick = async () => { const r = await fetchShared(joinCode); if (!stop && r) setSharedItems(r.items || []); };
+    tick(); const t = setInterval(tick, 5000);
+    return () => { stop = true; clearInterval(t); };
+  }, [joinCode]);
+
+  // Export .ics (rappel de courses dans l'agenda, demain 10h)
+  const handleICS = () => {
+    const d = new Date(Date.now() + 24 * 3600 * 1000);
+    const p = n => String(n).padStart(2, '0');
+    const start = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}T100000`;
+    const end = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}T103000`;
+    const desc = buildText().replace(/\r?\n/g, '\\n');
+    const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//BudgetChef Pro//FR\r\nBEGIN:VEVENT\r\nUID:${Date.now()}@budgetchef\r\nDTSTAMP:${start}\r\nDTSTART:${start}\r\nDTEND:${end}\r\nSUMMARY:Courses BudgetChef Pro\r\nDESCRIPTION:${desc}\r\nEND:VEVENT\r\nEND:VCALENDAR`;
+    const blob = new Blob([ics], { type: 'text/calendar' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'courses-budgetchef.ics'; a.click(); URL.revokeObjectURL(a.href);
+  };
+
+  // Texte partageable (exclut le garde-manger, inclut les ajouts)
   const buildText = () =>
     'BudgetChef Pro — Liste de courses\n\n' +
-    AISLE_ORDER.filter(a => grouped[a]).map(a =>
-      `${a} :\n` + grouped[a].map(i => `• ${i.name} — ${i.qty}  (${SUPERMARKETS.find(s => s.id === i.store)?.name}, ≈${fmtEuro(i.estPrice)})`).join('\n')
-    ).join('\n\n') +
+    AISLE_ORDER.filter(a => grouped[a]).map(a => {
+      const list = grouped[a].filter(i => !owned[i.name]);
+      if (!list.length) return '';
+      return `${a} :\n` + list.map(i => `${emojiFor(i.name, i.aisle)} ${i.name} — ${i.qty}  (${SUPERMARKETS.find(s => s.id === i.store)?.name}, ≈${fmtEuro(i.estPrice)})`).join('\n');
+    }).filter(Boolean).join('\n\n') +
+    (extras.length ? `\n\nAjouts :\n` + extras.map(e => `• ${e.name}`).join('\n') : '') +
     `\n\nTotal estimé : ${fmtEuro(totalCost)}`;
 
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(buildText()).catch(() => {});
-    setCopied(true); setTimeout(() => setCopied(false), 1800);
-  };
+  const handleCopy = () => { navigator.clipboard?.writeText(buildText()).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1800); };
+  const handleWhatsApp = () => { window.open('https://wa.me/?text=' + encodeURIComponent(buildText()), '_blank', 'noopener,noreferrer'); };
 
-  // Ouvre WhatsApp (appli ou web) avec la liste pre-remplie
-  const handleWhatsApp = () => {
-    const url = 'https://wa.me/?text=' + encodeURIComponent(buildText());
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  // Genere un vrai PDF telechargeable de la liste de courses
   const handlePDF = async () => {
-    const { jsPDF } = await import('jspdf');
+    let jsPDF; try { ({ jsPDF } = await import('jspdf')); } catch (e) { alert("L'export PDF fonctionne sur la version déployée du site."); return; }
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-    const marginX = 16;
-    let y = 20;
+    const marginX = 16; let y = 20;
     const pageH = doc.internal.pageSize.getHeight();
-    const newPageIfNeeded = (h) => { if (y + h > pageH - 16) { doc.addPage(); y = 20; } };
-
+    const nl = (h) => { if (y + h > pageH - 16) { doc.addPage(); y = 20; } };
     doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(15, 23, 42);
     doc.text('BudgetChef Pro', marginX, y); y += 7;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(100, 116, 139);
     doc.text('Liste de courses de la semaine', marginX, y); y += 10;
-
     AISLE_ORDER.filter(a => grouped[a]).forEach(aisle => {
-      newPageIfNeeded(14);
+      const list = grouped[aisle].filter(i => !owned[i.name]);
+      if (!list.length) return;
+      nl(14);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(16, 185, 129);
       doc.text(aisle.toUpperCase(), marginX, y); y += 6;
       doc.setDrawColor(226, 232, 240); doc.line(marginX, y - 3, 194, y - 3);
       doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(51, 65, 85);
-      grouped[aisle].forEach(i => {
-        newPageIfNeeded(7);
-        const store = SUPERMARKETS.find(s => s.id === i.store)?.name || '';
-        doc.text(`[ ]  ${i.name} — ${i.qty}`, marginX, y);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`${store}  ~${fmtEuro(i.estPrice)}`, 194, y, { align: 'right' });
-        doc.setTextColor(51, 65, 85);
-        y += 6;
-      });
+      list.forEach(i => { nl(7); const st = SUPERMARKETS.find(s => s.id === i.store)?.name || ''; doc.text(`[ ]  ${i.name} — ${i.qty}`, marginX, y); doc.setTextColor(148, 163, 184); doc.text(`${st}  ~${fmtEuro(i.estPrice)}`, 194, y, { align: 'right' }); doc.setTextColor(51, 65, 85); y += 6; });
       y += 4;
     });
-
-    newPageIfNeeded(12);
-    doc.setDrawColor(226, 232, 240); doc.line(marginX, y, 194, y); y += 8;
+    nl(12); doc.setDrawColor(226, 232, 240); doc.line(marginX, y, 194, y); y += 8;
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(15, 23, 42);
-    doc.text('Total estime', marginX, y);
-    doc.text(fmtEuro(totalCost), 194, y, { align: 'right' });
-
+    doc.text('Total estime', marginX, y); doc.text(fmtEuro(totalCost), 194, y, { align: 'right' });
     doc.save('liste-de-courses-budgetchef.pdf');
   };
 
+  const Row = (item) => {
+    const pack = packagingNote(item.name, item.amount, item.unit);
+    return (
+    <li key={item.name} className="group">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2.5 min-w-0 cursor-pointer" onClick={() => toggle(item.name)}>
+          <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-md border transition-all ${checked[item.name] ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 group-hover:border-emerald-400'}`}>
+            {checked[item.name] && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+          </span>
+          <span className={`text-sm min-w-0 flex items-center gap-1.5 ${owned[item.name] ? 'text-slate-300 line-through' : checked[item.name] ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+            <span className="text-base leading-none">{emojiFor(item.name, item.aisle)}</span>
+            <span className="truncate">{item.name}</span>
+            <span className="text-xs font-semibold text-slate-500">{item.qty}</span>
+          </span>
+        </span>
+        <span className="flex-none flex items-center gap-1.5">
+          {!owned[item.name] && <span className="text-[11px] font-semibold text-slate-500">≈{fmtEuro(item.estPrice)}</span>}
+          {!byStore && <span className="text-[11px] font-medium text-slate-400"><StoreLabel storeId={item.store} imgClass="h-3.5" /></span>}
+          <button onClick={() => toggleOwned(item.name)} title="J'ai déjà (garde-manger)" className={`rounded-md p-1 transition-colors ${owned[item.name] ? 'text-emerald-600' : 'text-slate-300 hover:text-slate-500'}`}><Refrigerator className="h-3.5 w-3.5" /></button>
+        </span>
+      </div>
+      {pack && !owned[item.name] && <p className="ml-7 text-[10px] text-slate-400">{pack}</p>}
+    </li>
+    );
+  };
+
   return (
-    <div className="rounded-3xl border border-slate-200/70 bg-white p-6">
+    <div id="courses-card" className="rounded-3xl border border-slate-200/70 bg-white p-6">
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><ShoppingCart className="h-5 w-5 text-emerald-600" /> Liste de courses</h3>
         <span className="text-xs text-slate-400">{allItems.filter(i => checked[i.name]).length}/{allItems.length} pris</span>
       </div>
-      <p className="text-sm text-slate-500 mb-1">Triée par rayon, avec l'enseigne la moins chère pour chaque produit.</p>
-      <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 my-4">
-        <span className="text-xs text-slate-500">Total réel du panier (toutes recettes)</span>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <p className="text-sm text-slate-500">Coche « j'ai déjà » 🧊 pour retirer un produit du total.</p>
+        <button onClick={() => setByStore(v => !v)} className="flex-none inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50">
+          <Store className="h-3.5 w-3.5" /> {byStore ? 'Par rayon' : 'Par magasin'}
+        </button>
+      </div>
+      <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 mb-4">
+        <span className="text-xs text-slate-500">Total réel du panier (hors garde-manger)</span>
         <span className="text-base font-bold text-slate-900">{fmtEuro(totalCost)}</span>
       </div>
-      <div className="space-y-6 mb-6">
-        {AISLE_ORDER.filter(a => grouped[a]).map(aisle => (
-          <div key={aisle}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2.5">{aisle}</p>
-            <ul className="space-y-2">
-              {grouped[aisle].map(item => (
-                <li key={item.name} onClick={() => toggle(item.name)} className="flex items-center justify-between gap-3 cursor-pointer group">
-                  <span className="flex items-center gap-2.5 min-w-0">
-                    <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-md border transition-all ${checked[item.name] ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 group-hover:border-emerald-400'}`}>
-                      {checked[item.name] && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-                    </span>
-                    <span className={`text-sm transition-all min-w-0 ${checked[item.name] ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                      <span className="truncate">{item.name}</span>
-                      <span className="ml-2 text-xs font-semibold text-slate-500">{item.qty}</span>
-                    </span>
-                  </span>
-                  <span className="flex-none flex items-center gap-2">
-                    <span className="text-[11px] font-semibold text-slate-500">≈{fmtEuro(item.estPrice)}</span>
-                    <span className="text-[11px] font-medium text-slate-400 capitalize">{SUPERMARKETS.find(s => s.id === item.store)?.name}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+
+      {usedStores.length > 1 && saveSplit > 0.01 && (
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 mb-4 text-xs">
+          <div className="flex items-center justify-between text-slate-600"><span>En 1 seul magasin</span><span className="font-semibold">{fmtEuro(singleBest)}</span></div>
+          <div className="flex items-center justify-between text-slate-600"><span>En multi-magasins optimisé</span><span className="font-semibold">{fmtEuro(fullMulti)}</span></div>
+          <div className="flex items-center justify-between text-emerald-700 font-bold mt-1 pt-1 border-t border-emerald-100"><span>Tu gagnes en répartissant</span><span>{fmtEuro(saveSplit)}</span></div>
+        </div>
+      )}
+
+      <div className="space-y-6 mb-5">
+        {!byStore ? (
+          AISLE_ORDER.filter(a => grouped[a]).map(aisle => (
+            <div key={aisle}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2.5">{aisle}</p>
+              <ul className="space-y-2">{grouped[aisle].map(Row)}</ul>
+            </div>
+          ))
+        ) : (
+          Object.keys(storeGroups).sort((a, b) => storeSubtotal(storeGroups[b]) - storeSubtotal(storeGroups[a])).map(storeId => (
+            <div key={storeId}>
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-1.5"><Store className="h-3.5 w-3.5" /> <StoreLabel storeId={storeId} imgClass="h-3.5" /></p>
+                <span className="text-[11px] font-semibold text-slate-500">{fmtEuro(storeSubtotal(storeGroups[storeId]))}</span>
+              </div>
+              <ul className="space-y-2">{storeGroups[storeId].map(Row)}</ul>
+            </div>
+          ))
+        )}
+
+        {/* Mes ajouts (articles ajoutés à la main) */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2.5">Mes ajouts</p>
+          <ul className="space-y-2 mb-2">
+            {extras.map(e => (
+              <li key={e.id} className="flex items-center justify-between gap-2 group">
+                <span className="flex items-center gap-2.5 min-w-0 cursor-pointer" onClick={() => setExtras(list => list.map(x => x.id === e.id ? { ...x, done: !x.done } : x))}>
+                  <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-md border transition-all ${e.done ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 group-hover:border-emerald-400'}`}>{e.done && <Check className="h-3 w-3 text-white" strokeWidth={3} />}</span>
+                  <span className={`text-sm ${e.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{e.name}</span>
+                </span>
+                <button onClick={() => setExtras(list => list.filter(x => x.id !== e.id))} className="rounded-md p-1 text-slate-300 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
+            <input value={newItem} onChange={e => setNewItem(e.target.value)} onKeyDown={e => e.key === 'Enter' && addExtra()} placeholder="Ajouter un article…" className="flex-1 rounded-lg border border-slate-200 bg-slate-50 py-2 px-3 text-sm outline-none focus:border-emerald-400 focus:bg-white" />
+            <button onClick={addExtra} className="rounded-lg border border-slate-200 px-3 text-slate-500 hover:bg-slate-50"><Plus className="h-4 w-4" /></button>
           </div>
-        ))}
+        </div>
       </div>
-      <p className="text-[11px] text-slate-400 -mt-4 mb-4">≈ estimation par article (prix de la recette répartie sur ses ingrédients), pas un prix exact en magasin.</p>
+
+      <p className="text-[11px] text-slate-400 mb-4">≈ estimation par article (prix de la recette réparti sur ses ingrédients), pas un prix exact en magasin.</p>
+
+      {/* Partage de la liste en temps réel (par code) */}
+      <div className="rounded-xl border border-slate-200 p-3 mb-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-emerald-600" /> Liste partagée</span>
+          <button onClick={startShare} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-600">Créer un code</button>
+        </div>
+        {shareCode && <p className="mt-2 text-xs text-slate-600">Partage ce code : <b className="tracking-widest text-emerald-700">{shareCode}</b> — les autres le saisissent pour voir la même liste.</p>}
+        <div className="mt-2 flex gap-2">
+          <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="Rejoindre un code…" className="flex-1 rounded-lg border border-slate-200 bg-slate-50 py-1.5 px-2.5 text-xs outline-none focus:border-emerald-400 focus:bg-white" />
+        </div>
+        {sharedItems && (
+          <ul className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+            {sharedItems.map((it, k) => <li key={k} className="text-xs text-slate-600 flex items-center gap-1.5"><span className="h-1 w-1 rounded-full bg-emerald-400" /> {it.name}{it.qty ? ` — ${it.qty}` : ''}</li>)}
+            <li className="text-[10px] text-slate-400 pt-1">Synchronisé en temps réel (toutes les 5 s){!user ? ' — connecte-toi pour partager' : ''}.</li>
+          </ul>
+        )}
+      </div>
+
       <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-100">
         <button onClick={handlePDF} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><Download className="h-3.5 w-3.5" /> Exporter en PDF</button>
-        <button onClick={handleWhatsApp} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><Package className="h-3.5 w-3.5" /> Envoyer par WhatsApp</button>
-        <button onClick={handleCopy} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-          <Copy className="h-3.5 w-3.5" /> {copied ? 'Copié !' : 'Copier'}
-        </button>
+        <button onClick={handleICS} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><Timer className="h-3.5 w-3.5" /> Ajouter à l'agenda</button>
+        <button onClick={handleWhatsApp} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><Package className="h-3.5 w-3.5" /> WhatsApp</button>
+        <button onClick={handleCopy} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><Copy className="h-3.5 w-3.5" /> {copied ? 'Copié !' : 'Copier'}</button>
       </div>
     </div>
   );
@@ -1322,6 +1814,8 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
 function Dashboard({ data, plan, setPlan, onRestart }) {
   const [open, setOpen] = useState(null); // { recipe, index }
   const [viewByDay, setViewByDay] = useState(false);
+  const { ustate, savePrefs } = useAuth();
+  const cooked = ustate?.cooked || [];
   const cheapestStoreFor = useCallback((recipe) => {
     const candidates = data.stores.length ? data.stores : SUPERMARKETS.map(s => s.id);
     return candidates.reduce((best, s) => recipe.prices[s] < recipe.prices[best] ? s : best, candidates[0]);
@@ -1329,7 +1823,12 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
 
   const people = data.adults + data.children * 0.6;
   const actualCost = plan.reduce((sum, r) => sum + r.prices[cheapestStoreFor(r)] * people, 0);
-  const classicCost = plan.reduce((sum, r) => sum + Math.max(...Object.values(r.prices)) * people, 0);
+  // Reference honnete : prix MOYEN des enseignes pour le meme menu (panier "sans optimisation"),
+  // plutot que le magasin le plus cher, qui gonflait artificiellement l'economie.
+  const classicCost = plan.reduce((sum, r) => {
+    const vals = Object.values(r.prices);
+    return sum + (vals.reduce((a, b) => a + b, 0) / vals.length) * people;
+  }, 0);
 
   // Type de repas correspondant a un emplacement du plan (le plan est range par type puis par jour)
   const mealTypesUsed = data.mealTypes.length ? data.mealTypes : ['dejeuner', 'diner'];
@@ -1364,6 +1863,47 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
     setOpen(o => (o ? { ...o, recipe: newRecipe } : o));
   };
 
+  // Ajustement automatique au budget : tant qu'on depasse, on remplace le repas
+  // le plus cher par l'alternative compatible la moins chere (si elle fait gagner).
+  const [shared, setShared] = useState(false);
+  const [prefsSaved, setPrefsSaved] = useState(false);
+  // Partage du menu par lien (encodé dans l'URL, aucune donnée serveur nécessaire)
+  const shareMenu = () => {
+    try {
+      const payload = btoa(encodeURIComponent(JSON.stringify({ data, planIds: plan.map(r => r.id) })));
+      const url = `${location.origin}${location.pathname}#menu=${payload}`;
+      navigator.clipboard?.writeText(url).catch(() => {});
+      setShared(true); setTimeout(() => setShared(false), 2200);
+    } catch { /* ignore */ }
+  };
+  const rememberPrefs = () => {
+    savePrefs({ stores: data.stores, budget: data.budget, adults: data.adults, children: data.children, days: data.days, mealTypes: data.mealTypes, equipment: data.equipment, diets: data.diets, prefs: data.prefs, goals: data.goals, dislikes: data.dislikes });
+    setPrefsSaved(true); setTimeout(() => setPrefsSaved(false), 2200);
+  };
+
+  const adjustToBudget = () => {
+    let current = plan.map(r => r);
+    let guard = 0;
+    const cost = (arr) => arr.reduce((s, r) => s + r.prices[cheapestStoreFor(r)] * people, 0);
+    while (cost(current) > data.budget && guard < 40) {
+      guard++;
+      // repas le plus cher
+      let worst = -1, worstPrice = -1;
+      current.forEach((r, i) => { const p = r.prices[cheapestStoreFor(r)]; if (p > worstPrice) { worstPrice = p; worst = i; } });
+      if (worst < 0) break;
+      const mt = slotMealType(worst);
+      const usedIds = new Set(current.map(r => r.id));
+      const cheaper = RECIPES.filter(r =>
+        r.mealType.includes(mt) && r.equipment.every(e => data.equipment.includes(e)) &&
+        data.diets.every(d => r.diets.includes(d)) && !matchesDislikes(r, data.dislikes) && !usedIds.has(r.id)
+      ).sort((a, b) => cheapestPrice(a, data.stores) - cheapestPrice(b, data.stores))[0];
+      if (!cheaper || cheapestPrice(cheaper, data.stores) >= worstPrice) break; // plus rien à gagner
+      current = current.map((r, i) => i === worst ? cheaper : r);
+    }
+    setPlan(current);
+  };
+  const overBudget = actualCost > data.budget;
+
   const mealTypeLabel = { petitdej: 'Petit-déjeuner', dejeuner: 'Déjeuner', diner: 'Dîner' };
   const mealTypeIcon = { petitdej: Coffee, dejeuner: Sandwich, diner: Moon };
   const byType = groupByMealType(plan, data.mealTypes, data.days);
@@ -1375,16 +1915,71 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 mb-1.5">Ton menu de la semaine</p>
           <h2 className="text-2xl font-bold text-slate-900">{plan.length} repas prêts, {data.adults + data.children} convive{data.adults + data.children > 1 ? 's' : ''}</h2>
+          <p className="text-xs text-slate-400 mt-1 flex items-center gap-1"><Flame className="h-3 w-3 text-orange-500" /> ≈ {Math.round(plan.reduce((s, r) => s + kcalFor(r), 0) / Math.max(1, data.days))} kcal / jour · par personne (estimation)</p>
         </div>
-        <button onClick={onRestart} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-          <RotateCcw className="h-3.5 w-3.5" /> Recommencer
-        </button>
+        <div className="flex items-center gap-2">
+          {overBudget && (
+            <button onClick={adjustToBudget} title="Remplacer des recettes pour rentrer dans le budget"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 transition-colors">
+              <TrendingDown className="h-3.5 w-3.5" /> Ajuster au budget
+            </button>
+          )}
+          <button onClick={() => setPlan(buildPlan(data, cooked))} title="Générer d'autres recettes avec les mêmes réglages"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> Régénérer
+          </button>
+          <button onClick={shareMenu} title="Copier un lien de partage du menu" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <ArrowRight className="h-3.5 w-3.5 rotate-[-45deg]" /> {shared ? 'Lien copié !' : 'Partager'}
+          </button>
+          <button onClick={rememberPrefs} title="Réutiliser ces réglages la prochaine fois" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <BookmarkCheck className="h-3.5 w-3.5" /> {prefsSaved ? 'Mémorisé !' : 'Préférences'}
+          </button>
+          <SaveMenuButton data={data} plan={plan} />
+          <button onClick={onRestart} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <RotateCcw className="h-3.5 w-3.5" /> Recommencer
+          </button>
+        </div>
       </div>
 
-      <div className="mb-8"><SavingsGauge budget={data.budget} actual={actualCost} classic={classicCost} /></div>
+      <div id="sec-budget" style={{ scrollMarginTop: '80px' }} className="mb-6"><SavingsGauge budget={data.budget} actual={actualCost} classic={classicCost} /></div>
+
+      {(() => {
+        const days = Math.max(1, data.days);
+        const mac = plan.reduce((a, r) => { const m = macrosFor(r); a.prot += m.prot; a.gluc += m.gluc; a.lip += m.lip; return a; }, { prot: 0, gluc: 0, lip: 0 });
+        const perDay = { prot: Math.round(mac.prot / days), gluc: Math.round(mac.gluc / days), lip: Math.round(mac.lip / days) };
+        const distinct = new Set(plan.map(r => r.id)).size;
+        const varietyPct = plan.length ? Math.round((distinct / plan.length) * 100) : 0;
+        const ag = antiGaspiScore(plan);
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+            <div className="rounded-2xl border border-slate-200/70 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Macros / jour</p>
+              <p className="text-sm font-bold text-slate-800">{perDay.prot}g P · {perDay.gluc}g G · {perDay.lip}g L</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">estimation, par personne</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Variété</p>
+              <p className="text-sm font-bold text-slate-800">{distinct} plats différents</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">{varietyPct}% de diversité</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-white p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Anti-gaspi</p>
+              <p className="text-sm font-bold text-emerald-600">{ag.pct}%</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">{ag.reused} ingrédient(s) réutilisé(s)</p>
+            </div>
+            <div className={`rounded-2xl border p-4 ${actualCost <= data.budget ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200/70 bg-white'}`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Défi budget</p>
+              {actualCost <= data.budget
+                ? <p className="text-sm font-bold text-emerald-700">✅ Réussi &lt; {fmtEuro(data.budget)}</p>
+                : <p className="text-sm font-bold text-slate-800">{fmtEuro(actualCost - data.budget)} au-dessus</p>}
+              <p className="text-[10px] text-slate-400 mt-0.5">semaine pour {data.adults + data.children} convive(s)</p>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2" id="sec-menu" style={{ scrollMarginTop: '80px' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-slate-500 flex items-center gap-2"><Star className="h-4 w-4 text-amber-500" /> Planning de la semaine</h3>
             <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1434,7 +2029,7 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
             </div>
           )}
         </div>
-        <div><ShoppingList recipes={plan} cheapestStoreFor={cheapestStoreFor} people={people} /></div>
+        <div id="sec-courses" style={{ scrollMarginTop: '80px' }}><ShoppingList recipes={plan} cheapestStoreFor={cheapestStoreFor} people={people} /></div>
       </div>
 
       <RecipeModal
@@ -1456,6 +2051,348 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
 /* =========================================================================
    ECRAN D'ACCUEIL
    ========================================================================= */
+/* =========================================================================
+   COMPTE : bouton d'entete, sauvegarde de menu, espaces favoris & historique
+   ========================================================================= */
+function SaveMenuButton({ data, plan }) {
+  const { saveCurrentMenu, user } = useAuth();
+  const [state, setState] = useState('idle'); // idle | saving | done
+  const handle = async () => {
+    setState('saving');
+    const label = `${plan.length} repas · ${data.adults + data.children} convive${data.adults + data.children > 1 ? 's' : ''}`;
+    const ok = await saveCurrentMenu(data, plan.map(r => r.id), label).catch(() => false);
+    setState(ok ? 'done' : 'idle');
+    if (ok) setTimeout(() => setState('idle'), 2200);
+  };
+  return (
+    <button onClick={handle} disabled={state === 'saving'}
+      className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 transition-colors disabled:opacity-60">
+      {state === 'done' ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+      {state === 'done' ? 'Menu sauvegardé' : (user ? 'Sauvegarder ce menu' : 'Se connecter pour sauvegarder')}
+    </button>
+  );
+}
+
+function AccountButton({ onOpenView }) {
+  const { user, logout, openAuth } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  if (!user) {
+    return (
+      <button onClick={() => openAuth('login')} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+        <User className="h-4 w-4" /> Se connecter
+      </button>
+    );
+  }
+  const initial = user.email[0].toUpperCase();
+  return (
+    <div className="relative">
+      <button onClick={() => setMenuOpen(o => !o)} className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white hover:bg-emerald-600 transition-colors" title={user.email}>
+        {initial}
+      </button>
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+          <div className="absolute right-0 top-11 z-40 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl animate-[fadeIn_0.15s_ease-out]">
+            <div className="px-3 py-2 text-xs text-slate-400 truncate">{user.email}</div>
+            <button onClick={() => { onOpenView('saved'); setMenuOpen(false); }} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"><BookmarkCheck className="h-4 w-4 text-emerald-600" /> Mes recettes</button>
+            <button onClick={() => { onOpenView('menus'); setMenuOpen(false); }} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"><History className="h-4 w-4 text-emerald-600" /> Mes menus</button>
+            <button onClick={() => { logout(); setMenuOpen(false); }} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"><LogOut className="h-4 w-4 text-slate-400" /> Se déconnecter</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AccountPanel({ view, onClose, onLoadMenu, people }) {
+  const { savedIds, menus, removeMenu } = useAuth();
+  const [openRecipe, setOpenRecipe] = useState(null);
+  const savedRecipes = RECIPES.filter(r => savedIds.has(r.id));
+  const cheapestStoreFor = (recipe) => SUPERMARKETS.map(s => s.id).reduce((best, s) => recipe.prices[s] < recipe.prices[best] ? s : best, 'lidl');
+  const fmtDate = (ts) => new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4 animate-[fadeIn_0.2s_ease-out]" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="relative w-full sm:max-w-2xl max-h-full sm:max-h-[85vh] bg-[#F8FAFC] sm:rounded-3xl flex flex-col overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 flex-none">
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            {view === 'saved' ? <><BookmarkCheck className="h-5 w-5 text-emerald-600" /> Mes recettes</> : <><History className="h-5 w-5 text-emerald-600" /> Mes menus</>}
+          </h3>
+          <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="overflow-y-auto p-6">
+          {view === 'saved' ? (
+            savedRecipes.length === 0 ? (
+              <EmptyState icon={Heart} text="Aucune recette sauvegardée pour l'instant. Touche le cœur sur une recette pour la retrouver ici." />
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {savedRecipes.map(r => (
+                  <RecipeCard key={r.id} recipe={r} cheapestStore={cheapestStoreFor(r)} onOpen={() => setOpenRecipe(r)} onReplace={() => {}} />
+                ))}
+              </div>
+            )
+          ) : (
+            menus.length === 0 ? (
+              <EmptyState icon={History} text="Aucun menu sauvegardé. Depuis un menu généré, clique sur « Sauvegarder ce menu »." />
+            ) : (
+              <div className="space-y-3">
+                {(() => {
+                  const menuCost = (m) => {
+                    const ppl = (m.data?.adults || 1) + (m.data?.children || 0) * 0.6;
+                    const stores = (m.data?.stores && m.data.stores.length) ? m.data.stores : SUPERMARKETS.map(s => s.id);
+                    return m.planIds.reduce((s, id) => { const r = RECIPES.find(x => x.id === id); if (!r) return s; const cheapest = stores.reduce((b, st) => r.prices[st] < r.prices[b] ? st : b, stores[0]); return s + r.prices[cheapest] * ppl; }, 0);
+                  };
+                  const series = menus.slice(0, 8).reverse().map(m => ({ v: menuCost(m), b: m.data?.budget || 0 }));
+                  const max = Math.max(1, ...series.map(s => Math.max(s.v, s.b)));
+                  return (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 mb-1">
+                      <p className="text-xs font-semibold text-slate-500 mb-3">Budget de tes derniers menus</p>
+                      <div className="flex items-end gap-2 h-28">
+                        {series.map((s, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1">
+                            <span className="text-[9px] font-semibold text-slate-500">{Math.round(s.v)}€</span>
+                            <div className="w-full rounded-t-md" style={{ height: `${Math.max(6, (s.v / max) * 90)}px`, background: s.b && s.v <= s.b ? '#10B981' : '#F59E0B' }} title={`Coût ${fmtEuro(s.v)} · Budget ${fmtEuro(s.b)}`} />
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-2">Vert = dans le budget · orange = au-dessus.</p>
+                    </div>
+                  );
+                })()}
+                {menus.map(m => (
+                  <div key={m.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800">{m.label || 'Menu'}</p>
+                      <p className="text-xs text-slate-400">{fmtDate(m.createdAt)} · {m.planIds.length} repas</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-none">
+                      <button onClick={() => onLoadMenu(m)} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors">Ouvrir</button>
+                      <button onClick={() => removeMenu(m.id)} title="Supprimer" className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:text-red-500 hover:border-red-200 transition-colors"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </div>
+      </div>
+      <RecipeModal recipe={openRecipe} cheapestStore={openRecipe ? cheapestStoreFor(openRecipe) : null} onClose={() => setOpenRecipe(null)} people={people} />
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, text }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100"><Icon className="h-6 w-6 text-slate-400" /></div>
+      <p className="max-w-xs text-sm text-slate-500 leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
+/* =========================================================================
+   MODE CUISINE (pas-à-pas plein écran + minuteurs)
+   ========================================================================= */
+function parseStepMinutes(step) { const m = (step || '').match(/(\d+)(?:\s*(?:à|-)\s*\d+)?\s*min/i); return m ? parseInt(m[1], 10) : null; }
+function cheapestGlobal(recipe) { return SUPERMARKETS.map(s => s.id).reduce((b, s) => recipe.prices[s] < recipe.prices[b] ? s : b, 'lidl'); }
+
+function CookMode({ recipe, onClose }) {
+  const steps = recipe.steps || [];
+  const [i, setI] = useState(0);
+  const [secs, setSecs] = useState(0);
+  const [running, setRunning] = useState(false);
+  const mins = parseStepMinutes(steps[i]);
+  useEffect(() => { setSecs(0); setRunning(false); }, [i]);
+  useEffect(() => {
+    if (!running || secs <= 0) return;
+    const t = setInterval(() => setSecs(s => (s <= 1 ? (setRunning(false), 0) : s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [running, secs]);
+  const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  const last = i === steps.length - 1;
+  return (
+    <div className="fixed inset-0 z-[70] bg-slate-900 text-white flex flex-col" style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif" }}>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+        <span className="text-sm font-semibold truncate">{recipe.name}</span>
+        <button onClick={onClose} className="rounded-full p-2 text-white/70 hover:bg-white/10"><X className="h-5 w-5" /></button>
+      </div>
+      <div className="h-1 bg-white/10"><div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${((i + 1) / steps.length) * 100}%` }} /></div>
+      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <span className="mb-4 text-sm font-semibold text-emerald-400">Étape {i + 1} / {steps.length}</span>
+        <p className="max-w-xl text-2xl sm:text-3xl font-semibold leading-snug">{steps[i]}</p>
+        {mins && (
+          <div className="mt-10 flex flex-col items-center gap-3">
+            <div className="text-5xl font-bold tabular-nums">{secs > 0 ? fmt(secs) : fmt(mins * 60)}</div>
+            <div className="flex gap-2">
+              {!running ? (
+                <button onClick={() => { if (secs <= 0) setSecs(mins * 60); setRunning(true); }} className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-600"><Play className="h-4 w-4" /> {secs > 0 ? 'Reprendre' : `Minuteur ${mins} min`}</button>
+              ) : (
+                <button onClick={() => setRunning(false)} className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-semibold hover:bg-white/20"><Pause className="h-4 w-4" /> Pause</button>
+              )}
+              {secs > 0 && <button onClick={() => { setSecs(0); setRunning(false); }} className="rounded-xl bg-white/10 px-4 py-2.5 text-sm hover:bg-white/20">Réinitialiser</button>}
+            </div>
+            {secs === 0 && running === false && running !== null && <span className="text-xs text-white/40">Minuteur indicatif basé sur l'étape</span>}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-white/10">
+        <button onClick={() => setI(x => Math.max(0, x - 1))} disabled={i === 0} className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold disabled:opacity-30"><ChevronLeft className="h-4 w-4" /> Précédent</button>
+        {last ? (
+          <button onClick={onClose} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold hover:bg-emerald-600"><Check className="h-4 w-4" /> Terminé</button>
+        ) : (
+          <button onClick={() => setI(x => Math.min(steps.length - 1, x + 1))} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold hover:bg-emerald-600">Suivant <ChevronRight className="h-4 w-4" /></button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   EXPLORER LES RECETTES (recherche + filtres) sur tout le catalogue
+   ========================================================================= */
+function BrowseRecipes({ onClose, people }) {
+  const { savedIds } = useAuth();
+  const [q, setQ] = useState('');
+  const [meal, setMeal] = useState('all'); // all | petitdej | dejeuner | diner
+  const [flags, setFlags] = useState({ express: false, healthy: false, saison: false, favoris: false, facile: false });
+  const [diet, setDiet] = useState(null);   // régime requis
+  const [goal, setGoal] = useState(null);   // objectif requis
+  const [noAll, setNoAll] = useState({});   // allergènes à exclure
+  const [open, setOpen] = useState(null);
+  const toggle = (k) => setFlags(f => ({ ...f, [k]: !f[k] }));
+
+  const results = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return RECIPES.filter(r => {
+      if (term && !r.name.toLowerCase().includes(term) && !r.ingredients.some(i => i.n.toLowerCase().includes(term))) return false;
+      if (meal !== 'all' && !r.mealType.includes(meal)) return false;
+      if (flags.express && r.prepTime > 15) return false;
+      if (flags.healthy && !r.goals.includes('healthy')) return false;
+      if (flags.saison && !isSeasonal(r)) return false;
+      if (flags.favoris && !savedIds.has(r.id)) return false;
+      if (flags.facile && difficultyFor(r).level > 1) return false;
+      if (diet && !r.diets.includes(diet)) return false;
+      if (goal && !r.goals.includes(goal)) return false;
+      const excl = Object.keys(noAll).filter(a => noAll[a]);
+      if (excl.length) { const has = allergensOf(r); if (excl.some(a => has.includes(a))) return false; }
+      return true;
+    });
+  }, [q, meal, flags, savedIds, diet, goal, noAll]);
+
+  const chip = (active, label, on) => (
+    <button onClick={on} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${active ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{label}</button>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4 animate-[fadeIn_0.2s_ease-out]" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="relative w-full sm:max-w-3xl max-h-full sm:max-h-[88vh] bg-[#F8FAFC] sm:rounded-3xl flex flex-col overflow-hidden shadow-2xl">
+        <div className="border-b border-slate-200 bg-white px-5 py-4 flex-none">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Search className="h-5 w-5 text-emerald-600" /> Explorer les recettes</h3>
+            <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="relative mb-3">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher une recette ou un ingrédient…" className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-emerald-400 focus:bg-white" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {chip(meal === 'all', 'Tous', () => setMeal('all'))}
+            {chip(meal === 'petitdej', 'Petit-déj', () => setMeal('petitdej'))}
+            {chip(meal === 'dejeuner', 'Déjeuner', () => setMeal('dejeuner'))}
+            {chip(meal === 'diner', 'Dîner', () => setMeal('diner'))}
+            <span className="w-px bg-slate-200 mx-1" />
+            {chip(flags.express, '≤ 15 min', () => toggle('express'))}
+            {chip(flags.healthy, 'Healthy', () => toggle('healthy'))}
+            {chip(flags.facile, 'Facile', () => toggle('facile'))}
+            {chip(flags.saison, 'De saison', () => toggle('saison'))}
+            {chip(flags.favoris, '❤ Favoris', () => toggle('favoris'))}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {DIETS.map(d => chip(diet === d.id, d.name, () => setDiet(diet === d.id ? null : d.id)))}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {GOALS.map(g => chip(goal === g.id, g.name, () => setGoal(goal === g.id ? null : g.id)))}
+            <span className="w-px bg-slate-200 mx-1" />
+            {['gluten', 'lactose', 'oeuf', 'fruits_a_coque'].map(a => chip(noAll[a], 'sans ' + ALLERGEN_LABELS[a].toLowerCase(), () => setNoAll(n => ({ ...n, [a]: !n[a] }))))}
+          </div>
+        </div>
+        <div className="overflow-y-auto p-5">
+          <p className="text-xs text-slate-400 mb-3">{results.length} recette{results.length > 1 ? 's' : ''}</p>
+          {results.length === 0 ? (
+            <EmptyState icon={Search} text="Aucune recette ne correspond. Essaie d'élargir tes filtres." />
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {results.map(r => <RecipeCard key={r.id} recipe={r} cheapestStore={cheapestGlobal(r)} onOpen={() => setOpen(r)} onReplace={() => {}} />)}
+            </div>
+          )}
+        </div>
+      </div>
+      <RecipeModal recipe={open} cheapestStore={open ? cheapestGlobal(open) : null} onClose={() => setOpen(null)} people={people} />
+    </div>
+  );
+}
+
+/* =========================================================================
+   CUISINER AVEC MON FRIGO : entre des ingrédients -> recettes qui les utilisent
+   ========================================================================= */
+function FridgeView({ onClose, people }) {
+  const [items, setItems] = useState([]);
+  const [input, setInput] = useState('');
+  const [open, setOpen] = useState(null);
+  const add = () => { const v = input.trim().toLowerCase(); if (v && !items.includes(v)) setItems([...items, v]); setInput(''); };
+
+  const results = useMemo(() => {
+    if (!items.length) return [];
+    return RECIPES.map(r => {
+      const have = r.ingredients.filter(ing => items.some(it => ing.n.toLowerCase().includes(it) || it.includes(ing.n.toLowerCase().split(' ')[0]))).length;
+      return { r, have, ratio: have / r.ingredients.length };
+    }).filter(x => x.have > 0).sort((a, b) => b.have - a.have || b.ratio - a.ratio).slice(0, 24);
+  }, [items]);
+
+  const suggestions = ['œufs', 'poulet', 'riz', 'tomate', 'pâtes', 'courgette', 'pomme de terre', 'fromage', 'oignon', 'lait'];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm p-0 sm:p-4 animate-[fadeIn_0.2s_ease-out]" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="relative w-full sm:max-w-3xl max-h-full sm:max-h-[88vh] bg-[#F8FAFC] sm:rounded-3xl flex flex-col overflow-hidden shadow-2xl">
+        <div className="border-b border-slate-200 bg-white px-5 py-4 flex-none">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Refrigerator className="h-5 w-5 text-emerald-600" /> Cuisiner avec mon frigo</h3>
+            <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
+          </div>
+          <p className="text-sm text-slate-500 mb-3">Ajoute ce que tu as sous la main, on te propose les recettes qui l'utilisent le plus.</p>
+          <div className="flex gap-2 mb-3">
+            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="Ex : œufs, courgette, riz…" className="flex-1 rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-sm outline-none focus:border-emerald-400 focus:bg-white" />
+            <button onClick={add} className="rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-white hover:bg-emerald-600">Ajouter</button>
+          </div>
+          {items.length === 0 ? (
+            <div className="flex flex-wrap gap-2">{suggestions.map(s => <button key={s} onClick={() => setItems([...items, s])} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200">+ {s}</button>)}</div>
+          ) : (
+            <div className="flex flex-wrap gap-2">{items.map(it => <span key={it} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-700">{it}<button onClick={() => setItems(items.filter(x => x !== it))}><X className="h-3 w-3" /></button></span>)}</div>
+          )}
+        </div>
+        <div className="overflow-y-auto p-5">
+          {items.length === 0 ? (
+            <EmptyState icon={Refrigerator} text="Ajoute au moins un ingrédient pour voir les recettes possibles." />
+          ) : results.length === 0 ? (
+            <EmptyState icon={Refrigerator} text="Aucune recette trouvée avec ça. Ajoute d'autres ingrédients." />
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {results.map(({ r, have }) => (
+                <div key={r.id} className="relative">
+                  <span className="absolute -top-2 -right-2 z-10 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">{have} ✓</span>
+                  <RecipeCard recipe={r} cheapestStore={cheapestGlobal(r)} onOpen={() => setOpen(r)} onReplace={() => {}} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <RecipeModal recipe={open} cheapestStore={open ? cheapestGlobal(open) : null} onClose={() => setOpen(null)} people={people} />
+    </div>
+  );
+}
+
 function HeroScreen({ onStart }) {
   const floatEmojis = ['🍛','🍗','🌮','🥗','🍜','🐟'];
   return (
@@ -1509,19 +2446,50 @@ export default function App() {
   const [step, setStep] = useState(0);
   const [data, setData] = useState(DEFAULT_DATA);
   const [plan, setPlan] = useState([]);
+  const [accountView, setAccountView] = useState(null); // null | 'saved' | 'menus'
+  const [activeTab, setActiveTab] = useState('menu'); // onglet actif de la barre du bas (mobile)
+  const [dark, setDark] = useState(false); // mode sombre
+  const [explore, setExplore] = useState(null); // null | 'browse' | 'fridge'
+  const auth = useAuth();
 
   const generatePlan = () => {
     setScreen('loading');
     setTimeout(() => {
-      setPlan(buildPlan(data));
+      setPlan(buildPlan(data, auth?.ustate?.cooked || []));
       setScreen('dashboard');
     }, 1600);
   };
 
   const restart = () => { setScreen('hero'); setStep(0); setData(DEFAULT_DATA); setPlan([]); };
 
+  // Recharge un menu sauvegarde : on reconstruit les recettes a partir de leurs ids
+  const loadMenu = (menu) => {
+    const restored = menu.planIds.map(id => RECIPES.find(r => r.id === id)).filter(Boolean);
+    setData({ ...DEFAULT_DATA, ...menu.data });
+    setPlan(restored);
+    setAccountView(null);
+    setScreen('dashboard');
+  };
+
+  const people = data.adults + data.children * 0.6;
+
+  // Charge un menu partagé encodé dans l'URL (#menu=...)
+  useEffect(() => {
+    const h = window.location.hash || '';
+    const m = h.match(/#menu=(.+)$/);
+    if (!m) return;
+    try {
+      const payload = JSON.parse(decodeURIComponent(atob(m[1])));
+      const restored = (payload.planIds || []).map(id => RECIPES.find(r => r.id === id)).filter(Boolean);
+      if (restored.length) { setData({ ...DEFAULT_DATA, ...payload.data }); setPlan(restored); setScreen('dashboard'); }
+      window.history.replaceState({}, '', window.location.pathname);
+    } catch { /* lien invalide */ }
+  }, []);
+
+  const startWizard = () => { if (auth?.prefs) setData(d => ({ ...d, ...auth.prefs })); setScreen('wizard'); };
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900" style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif" }}>
+    <div className={`min-h-screen bg-[#F8FAFC] text-slate-900 ${dark ? 'theme-dark' : ''}`} style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif" }}>
       <style>{`
         @keyframes stepIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
@@ -1532,6 +2500,19 @@ export default function App() {
         @keyframes fadeSlideIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
         @keyframes floatY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
         .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        /* ---- Mode sombre : surcharges ciblees de la palette slate ---- */
+        .theme-dark { background:#0b1220 !important; color:#e2e8f0; }
+        .theme-dark .bg-\\[\\#F8FAFC\\] { background:#0b1220 !important; }
+        .theme-dark .bg-white, .theme-dark .bg-white\\/80, .theme-dark .bg-white\\/90, .theme-dark .bg-white\\/95 { background:#111827 !important; }
+        .theme-dark .bg-slate-50, .theme-dark .bg-slate-50\\/70, .theme-dark .bg-slate-50\\/80, .theme-dark .bg-slate-100 { background:#1f2937 !important; }
+        .theme-dark .text-slate-900 { color:#f1f5f9 !important; }
+        .theme-dark .text-slate-800 { color:#e5e7eb !important; }
+        .theme-dark .text-slate-700 { color:#cbd5e1 !important; }
+        .theme-dark .text-slate-600, .theme-dark .text-slate-500 { color:#94a3b8 !important; }
+        .theme-dark .text-slate-400, .theme-dark .text-slate-300 { color:#64748b !important; }
+        .theme-dark .border-slate-200, .theme-dark .border-slate-200\\/70, .theme-dark .border-slate-100, .theme-dark .border-slate-300 { border-color:#273244 !important; }
+        .theme-dark input, .theme-dark textarea { background:#0f172a !important; color:#e2e8f0 !important; }
+        .theme-dark .shadow-lg, .theme-dark .shadow-xl, .theme-dark .shadow-2xl, .theme-dark .shadow-md, .theme-dark .shadow-sm { box-shadow:0 10px 30px rgba(0,0,0,.5) !important; }
       `}</style>
 
       <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
@@ -1542,12 +2523,18 @@ export default function App() {
             </div>
             <span className="font-bold text-slate-900">BudgetChef <span className="text-emerald-600">Pro</span></span>
           </div>
-          {screen === 'wizard' && <span className="text-xs font-medium text-slate-400">Étape {step + 1} / 4</span>}
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            {screen === 'wizard' && <span className="text-xs font-medium text-slate-400 mr-1">Étape {step + 1} / 4</span>}
+            <button onClick={() => setExplore('browse')} title="Explorer les recettes" className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"><Search className="h-4 w-4" /></button>
+            <button onClick={() => setExplore('fridge')} title="Cuisiner avec mon frigo" className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"><Refrigerator className="h-4 w-4" /></button>
+            <button onClick={() => setDark(v => !v)} title={dark ? 'Mode clair' : 'Mode sombre'} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">{dark ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}</button>
+            <AccountButton onOpenView={setAccountView} />
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-5 sm:px-8 py-10 sm:py-14 pb-24">
-        {screen === 'hero' && <div className="max-w-2xl mx-auto"><HeroScreen onStart={() => setScreen('wizard')} /></div>}
+        {screen === 'hero' && <div className="max-w-2xl mx-auto"><HeroScreen onStart={startWizard} /></div>}
         {screen === 'wizard' && (
           <div className="max-w-xl mx-auto">
             <ProgressBar step={step} total={4} />
@@ -1561,14 +2548,30 @@ export default function App() {
         {screen === 'dashboard' && <Dashboard data={data} plan={plan} setPlan={setPlan} onRestart={restart} />}
       </main>
 
-      {/* Barre de navigation mobile (esthetique, mobile-first) */}
+      {/* Barre de navigation mobile : defile vers la section correspondante */}
       {screen === 'dashboard' && (
         <nav className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-around border-t border-slate-200 bg-white/95 backdrop-blur-md py-2.5 sm:hidden">
-          <div className="flex flex-col items-center gap-0.5 text-emerald-600"><UtensilsCrossed className="h-5 w-5" /><span className="text-[10px] font-medium">Menu</span></div>
-          <div className="flex flex-col items-center gap-0.5 text-slate-400"><ShoppingCart className="h-5 w-5" /><span className="text-[10px] font-medium">Courses</span></div>
-          <div className="flex flex-col items-center gap-0.5 text-slate-400"><Wallet className="h-5 w-5" /><span className="text-[10px] font-medium">Budget</span></div>
+          {[
+            { id: 'menu', anchor: 'sec-menu', icon: UtensilsCrossed, label: 'Menu' },
+            { id: 'courses', anchor: 'sec-courses', icon: ShoppingCart, label: 'Courses' },
+            { id: 'budget', anchor: 'sec-budget', icon: Wallet, label: 'Budget' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); document.getElementById(tab.anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+              className={`flex flex-col items-center gap-0.5 transition-colors ${activeTab === tab.id ? 'text-emerald-600' : 'text-slate-400'}`}
+            >
+              <tab.icon className="h-5 w-5" />
+              <span className="text-[10px] font-medium">{tab.label}</span>
+            </button>
+          ))}
         </nav>
       )}
+
+      <VerifiedBanner />
+      {accountView && <AccountPanel view={accountView} onClose={() => setAccountView(null)} onLoadMenu={loadMenu} people={people} />}
+      {explore === 'browse' && <BrowseRecipes onClose={() => setExplore(null)} people={people} />}
+      {explore === 'fridge' && <FridgeView onClose={() => setExplore(null)} people={people} />}
     </div>
   );
 }

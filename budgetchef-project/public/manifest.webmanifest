@@ -1,0 +1,12 @@
+{
+  "name": "BudgetChef Pro",
+  "short_name": "BudgetChef",
+  "description": "Planifie tes repas de la semaine selon ton budget, ton équipement et tes goûts.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#10b981",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
