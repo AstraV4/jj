@@ -279,9 +279,158 @@ const RECIPES = [
 ];
 RECIPES.forEach(r => { r.prices = priceMap(r.base); });
 
-const AISLE_ORDER = ['Fruits & Légumes', 'Boucherie', 'Frais', 'Épicerie', 'Surgelés'];
+const AISLE_ORDER = ['Fruits & Légumes', 'Boucherie', 'Frais', 'Boulangerie', 'Épicerie', 'Surgelés'];
 
 function fmtEuro(n) { return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+
+/* =========================================================================
+   QUANTITES PAR INGREDIENT
+   -------------------------------------------------------------------------
+   Chaque ingredient a une quantite de base PAR PERSONNE (b), une unite (u)
+   et un indicateur (s) : s=true => la quantite est multipliee par le nombre
+   de convives ; s=false => quantite quasi fixe (epices, herbes, sauces) qui
+   grossit seulement un peu pour les grandes tablees.
+   Les ingredients non listes retombent sur une valeur par defaut selon leur
+   rayon (voir AISLE_FALLBACK). Unites : g, ml, u (piece/unite), tr (tranche),
+   gousse, cs (c. a soupe), cc (c. a cafe), pincee, poignee, brins, boite.
+   ========================================================================= */
+const QTY = {
+  // --- Viandes & poissons (Boucherie / Frais) ---
+  'Blanc de poulet': { b: 130, u: 'g', s: true }, 'Cuisses de poulet': { b: 180, u: 'g', s: true },
+  'Bœuf haché': { b: 125, u: 'g', s: true }, 'Steak haché': { b: 130, u: 'g', s: true }, 'Bœuf émincé': { b: 120, u: 'g', s: true },
+  'Bœuf à bourguignon': { b: 150, u: 'g', s: true }, 'Bœuf à mijoter': { b: 150, u: 'g', s: true },
+  'Filet mignon de porc': { b: 140, u: 'g', s: true }, 'Poitrine de porc': { b: 130, u: 'g', s: true },
+  'Épaule d\'agneau': { b: 160, u: 'g', s: true }, 'Merguez': { b: 2, u: 'u', s: true },
+  'Lardons': { b: 50, u: 'g', s: true }, 'Bacon': { b: 2, u: 'tr', s: true }, 'Jambon': { b: 1, u: 'tr', s: true },
+  'Pavé de saumon': { b: 130, u: 'g', s: true }, 'Saumon frais': { b: 130, u: 'g', s: true }, 'Saumon fumé': { b: 60, u: 'g', s: true },
+  'Crevettes': { b: 90, u: 'g', s: true }, 'Moules fraîches': { b: 250, u: 'g', s: true },
+  'Fruits de mer surgelés': { b: 180, u: 'g', s: true }, 'Tofu ferme': { b: 100, u: 'g', s: true },
+  // --- Œufs & produits frais ---
+  'Œufs': { b: 2, u: 'u', s: true }, 'Œuf mollet': { b: 1, u: 'u', s: true },
+  'Parmesan': { b: 25, u: 'g', s: true }, 'Gruyère râpé': { b: 30, u: 'g', s: true }, 'Emmental': { b: 30, u: 'g', s: true },
+  'Cheddar': { b: 30, u: 'g', s: true }, 'Mozzarella': { b: 40, u: 'g', s: true }, 'Feta': { b: 40, u: 'g', s: true },
+  'Ricotta': { b: 40, u: 'g', s: true }, 'Houmous': { b: 40, u: 'g', s: true }, 'Fromage frais': { b: 40, u: 'g', s: true },
+  'Fromage de chèvre': { b: 40, u: 'g', s: true }, 'Crème fraîche': { b: 50, u: 'ml', s: true },
+  'Lait': { b: 150, u: 'ml', s: true }, 'Lait végétal': { b: 150, u: 'ml', s: true }, 'Lait de coco': { b: 100, u: 'ml', s: true },
+  'Beurre': { b: 15, u: 'g', s: true }, 'Yaourt nature': { b: 1, u: 'u', s: true }, 'Yaourt grec': { b: 125, u: 'g', s: true },
+  'Whey protéine': { b: 30, u: 'g', s: true }, 'Pâte à pizza': { b: 1, u: 'u', s: false }, 'Pâte à pain': { b: 1, u: 'u', s: false }, 'Pâte à empanadas': { b: 1, u: 'u', s: false },
+  // --- Feculents & legumineuses (Epicerie) ---
+  'Riz': { b: 70, u: 'g', s: true }, 'Riz long grain': { b: 70, u: 'g', s: true }, 'Riz rond': { b: 70, u: 'g', s: true },
+  'Riz à sushi': { b: 70, u: 'g', s: true }, 'Riz arborio': { b: 70, u: 'g', s: true }, 'Riz à paella': { b: 70, u: 'g', s: true },
+  'Quinoa': { b: 70, u: 'g', s: true }, 'Semoule de couscous': { b: 70, u: 'g', s: true },
+  'Spaghetti': { b: 90, u: 'g', s: true }, 'Pâtes courtes': { b: 90, u: 'g', s: true }, 'Nouilles de riz': { b: 80, u: 'g', s: true },
+  'Nouilles udon': { b: 90, u: 'g', s: true }, 'Nouilles ramen': { b: 90, u: 'g', s: true }, 'Gnocchis': { b: 150, u: 'g', s: true },
+  'Plaques de lasagnes': { b: 3, u: 'u', s: true },
+  'Lentilles': { b: 70, u: 'g', s: true }, 'Lentilles corail': { b: 70, u: 'g', s: true },
+  'Pois chiches': { b: 80, u: 'g', s: true }, 'Haricots rouges': { b: 80, u: 'g', s: true },
+  'Flocons d\'avoine': { b: 50, u: 'g', s: true }, 'Muesli': { b: 50, u: 'g', s: true }, 'Granola': { b: 45, u: 'g', s: true },
+  'Farine': { b: 60, u: 'g', s: true }, 'Farine de sarrasin': { b: 60, u: 'g', s: true }, 'Chapelure': { b: 30, u: 'g', s: true },
+  'Croûtons': { b: 20, u: 'g', s: true }, 'Tomates concassées': { b: 100, u: 'g', s: true }, 'Sauce tomate': { b: 80, u: 'ml', s: true },
+  'Béchamel': { b: 80, u: 'ml', s: true }, 'Feuilles de nori': { b: 1, u: 'u', s: true },
+  'Tortillas de blé': { b: 2, u: 'u', s: true }, 'Tortillas de maïs': { b: 2, u: 'u', s: true },
+  // --- Boulangerie ---
+  'Pain de campagne': { b: 2, u: 'tr', s: true }, 'Pain complet': { b: 2, u: 'tr', s: true }, 'Pain de mie': { b: 2, u: 'tr', s: true },
+  'Pain rassis': { b: 2, u: 'tr', s: true }, 'Pain à burger': { b: 1, u: 'u', s: true }, 'Bagel': { b: 1, u: 'u', s: true },
+  'Muffin anglais': { b: 1, u: 'u', s: true }, 'Brioche': { b: 2, u: 'tr', s: true },
+  // --- Legumes & fruits ---
+  'Carottes': { b: 1, u: 'u', s: true }, 'Poivron': { b: 1, u: 'u', s: true }, 'Oignon': { b: 1, u: 'u', s: true },
+  'Oignons': { b: 1, u: 'u', s: true }, 'Échalote': { b: 1, u: 'u', s: true }, 'Ail': { b: 1, u: 'gousse', s: true },
+  'Tomate': { b: 1, u: 'u', s: true }, 'Tomates': { b: 1, u: 'u', s: true }, 'Courgette': { b: 1, u: 'u', s: true },
+  'Courgettes': { b: 1, u: 'u', s: true }, 'Aubergine': { b: 1, u: 'u', s: true }, 'Pommes de terre': { b: 200, u: 'g', s: true },
+  'Champignons': { b: 80, u: 'g', s: true }, 'Champignons de Paris': { b: 80, u: 'g', s: true }, 'Céleri': { b: 1, u: 'u', s: true },
+  'Épinards frais': { b: 100, u: 'g', s: true }, 'Brocolis': { b: 120, u: 'g', s: true }, 'Courge butternut': { b: 200, u: 'g', s: true },
+  'Salade': { b: 1, u: 'poignee', s: true }, 'Salade romaine': { b: 1, u: 'poignee', s: true }, 'Concombre': { b: 0.5, u: 'u', s: true },
+  'Banane': { b: 1, u: 'u', s: true }, 'Avocat': { b: 0.5, u: 'u', s: true }, 'Citron': { b: 0.5, u: 'u', s: true },
+  'Pomme': { b: 1, u: 'u', s: true }, 'Pommes': { b: 1, u: 'u', s: true }, 'Pêche': { b: 1, u: 'u', s: true }, 'Mangue': { b: 0.5, u: 'u', s: true },
+  'Fruits rouges': { b: 60, u: 'g', s: true }, 'Fraises': { b: 60, u: 'g', s: true },
+  // --- Surgeles ---
+  'Petits pois': { b: 80, u: 'g', s: true }, 'Maïs': { b: 60, u: 'g', s: true }, 'Edamame': { b: 60, u: 'g', s: true },
+  'Fruits rouges surgelés': { b: 70, u: 'g', s: true },
+  // --- Herbes, epices, sauces & extras (quasi fixes) ---
+  'Miel': { b: 1, u: 'cs', s: false }, 'Sucre': { b: 1, u: 'cs', s: false }, 'Sucre roux': { b: 1, u: 'cs', s: false },
+  'Huile d\'olive': { b: 1, u: 'cs', s: false }, 'Huile de coco': { b: 1, u: 'cs', s: false },
+  'Sauce soja': { b: 1, u: 'cs', s: false }, 'Sauce soja sucrée': { b: 1, u: 'cs', s: false }, 'Sauce nuoc-mâm': { b: 1, u: 'cs', s: false },
+  'Sauce teriyaki': { b: 1, u: 'cs', s: false }, 'Sauce pad thaï': { b: 2, u: 'cs', s: false }, 'Sauce piquante': { b: 1, u: 'cc', s: false },
+  'Sauce enchilada': { b: 100, u: 'ml', s: true }, 'Beurre de cacahuète': { b: 1, u: 'cs', s: false },
+  'Pâte de curry': { b: 1, u: 'cs', s: false }, 'Pâte de curry vert': { b: 1, u: 'cs', s: false }, 'Pâte de curry rouge': { b: 1, u: 'cs', s: false },
+  'Pâte miso': { b: 1, u: 'cs', s: false }, 'Bouillon de légumes': { b: 1, u: 'u', s: false }, 'Bouillon de bœuf': { b: 1, u: 'u', s: false },
+  'Bouillon miso': { b: 1, u: 'u', s: false }, 'Bouillon pho': { b: 1, u: 'u', s: false },
+  'Curry en poudre': { b: 1, u: 'cc', s: false }, 'Épices curry': { b: 1, u: 'cc', s: false }, 'Épices tikka': { b: 1, u: 'cc', s: false },
+  'Cannelle': { b: 1, u: 'cc', s: false }, 'Cumin': { b: 1, u: 'cc', s: false }, 'Paprika': { b: 1, u: 'cc', s: false },
+  'Muscade': { b: 1, u: 'pincee', s: false }, 'Safran': { b: 1, u: 'pincee', s: false }, 'Ras el hanout': { b: 1, u: 'cc', s: false },
+  'Za\'atar': { b: 1, u: 'cc', s: false }, 'Piment doux': { b: 1, u: 'cc', s: false },
+  'Thym': { b: 1, u: 'brins', s: false }, 'Persil': { b: 1, u: 'brins', s: false }, 'Basilic': { b: 1, u: 'brins', s: false },
+  'Basilic thaï': { b: 1, u: 'brins', s: false }, 'Coriandre': { b: 1, u: 'brins', s: false }, 'Aneth': { b: 1, u: 'brins', s: false },
+  'Ciboule': { b: 1, u: 'brins', s: false },
+  'Graines de chia': { b: 1, u: 'cs', s: false }, 'Graines de sésame': { b: 1, u: 'cs', s: false },
+  'Cacao en poudre': { b: 1, u: 'cs', s: false }, 'Amandes': { b: 20, u: 'g', s: true }, 'Noix': { b: 20, u: 'g', s: true },
+  'Cacahuètes': { b: 20, u: 'g', s: true }, 'Olives': { b: 30, u: 'g', s: true }, 'Pruneaux': { b: 30, u: 'g', s: true },
+  'Vin rouge de cuisine': { b: 100, u: 'ml', s: false }, 'Vin rouge à cuisiner': { b: 100, u: 'ml', s: false }, 'Vin blanc à cuisiner': { b: 100, u: 'ml', s: false },
+};
+
+const AISLE_FALLBACK = {
+  'Fruits & Légumes': { b: 1, u: 'u', s: true },
+  'Boucherie': { b: 120, u: 'g', s: true },
+  'Frais': { b: 50, u: 'g', s: true },
+  'Boulangerie': { b: 1, u: 'u', s: true },
+  'Épicerie': { b: 1, u: 'cs', s: false },
+  'Surgelés': { b: 80, u: 'g', s: true },
+};
+
+function qtySpec(ing) { return QTY[ing.n] || AISLE_FALLBACK[ing.a] || { b: 1, u: 'u', s: true }; }
+
+// Quantite numerique brute (avant mise en forme) pour un nombre de convives donne.
+// Les ingredients "non scalables" (epices, herbes) grossissent legerement pour les grandes tablees.
+function rawAmount(spec, people) {
+  const p = Math.max(1, people);
+  if (spec.s) return spec.b * p;
+  return spec.b * (p <= 2 ? 1 : p <= 4 ? 1.5 : 2);
+}
+
+// Arrondi lisible selon l'unite
+function roundAmount(amt, unit) {
+  if (unit === 'g') { const step = amt < 50 ? 5 : amt < 200 ? 10 : 25; return Math.max(5, Math.round(amt / step) * step); }
+  if (unit === 'ml') { return Math.max(10, Math.round(amt / 10) * 10); }
+  if (unit === 'cs' || unit === 'cc') { return Math.max(0.5, Math.round(amt * 2) / 2); }
+  // unites, tranches, gousses, pincees, poignees...
+  return Math.max(0.5, Math.round(amt * 2) / 2);
+}
+
+function fmtFraction(n) {
+  const whole = Math.floor(n);
+  const frac = n - whole;
+  const half = frac >= 0.25 && frac < 0.75;
+  const roundUp = frac >= 0.75;
+  const w = roundUp ? whole + 1 : whole;
+  if (half) return w === 0 ? '½' : w + '½';
+  return String(w);
+}
+
+const UNIT_LABEL = {
+  tr: n => (n > 1 ? ' tranches' : ' tranche'),
+  gousse: n => (n > 1 ? ' gousses' : ' gousse'),
+  cs: n => ' c. à s.',
+  cc: n => ' c. à c.',
+  pincee: n => (n > 1 ? ' pincées' : ' pincée'),
+  poignee: n => (n > 1 ? ' poignées' : ' poignée'),
+  u: n => '',
+};
+
+// Rend une quantite prete a afficher (ex : "260 g", "3 gousses", "1½", "quelques brins")
+function fmtQty(amt, unit) {
+  if (unit === 'brins') return 'quelques brins';
+  if (unit === 'g') return roundAmount(amt, 'g') + ' g';
+  if (unit === 'ml') { const v = roundAmount(amt, 'ml'); return v >= 1000 ? (v / 1000).toString().replace('.', ',') + ' L' : v + ' ml'; }
+  const v = roundAmount(amt, unit);
+  const label = (UNIT_LABEL[unit] || (() => ''))(v);
+  return fmtFraction(v) + label;
+}
+
+// Quantite affichable pour un ingredient d'une recette, mise a l'echelle du foyer
+function ingredientQty(ing, people) {
+  const spec = qtySpec(ing);
+  return fmtQty(rawAmount(spec, people), spec.u);
+}
 
 // Petit generateur pseudo-aleatoire deterministe (meme id = toujours le meme rendu, mais different d'un plat a l'autre)
 function seededRandom(seed) {
@@ -419,6 +568,8 @@ function buildPlan(data) {
   // Budget par portion, par repas : ce que chaque repas peut couter au maximum pour rester dans l'enveloppe fixee
   const budgetPerPortion = totalMeals > 0 && people > 0 ? data.budget / totalMeals / people : 0;
 
+  const usedGlobal = new Set(); // aucune recette ne doit revenir deux fois dans la semaine
+
   mealTypes.forEach(mealType => {
     const hardFilter = (r, withDislikes) =>
       r.mealType.includes(mealType) &&
@@ -435,12 +586,19 @@ function buildPlan(data) {
     // donc dans un ordre different a chaque fois
     const ranked = shuffle(pool).sort((a, b) => scoreRecipe(b, data, budgetPerPortion) - scoreRecipe(a, data, budgetPerPortion));
 
-    // Tire "days" recettes en respectant l'ordre de score, en evitant les repetitions autant que possible
+    // Tire "days" recettes : on privilegie celles pas encore utilisees ailleurs dans la semaine,
+    // et on n'autorise une repetition qu'en tout dernier recours (pool entierement epuise).
     const chosen = [];
-    let cycle = [...ranked];
+    let cycle = ranked.filter(r => !usedGlobal.has(r.id));
+    if (cycle.length === 0) cycle = [...ranked];
     for (let i = 0; i < data.days; i++) {
-      if (cycle.length === 0) cycle = shuffle(ranked); // si on doit repasser par le pool, on re-brasse l'ordre
-      chosen.push(cycle.shift());
+      if (cycle.length === 0) {
+        const fresh = ranked.filter(r => !usedGlobal.has(r.id));
+        cycle = fresh.length ? shuffle(fresh) : shuffle(ranked);
+      }
+      const pick = cycle.shift();
+      chosen.push(pick);
+      usedGlobal.add(pick.id);
     }
     plan.push(...chosen);
   });
@@ -870,8 +1028,13 @@ function RecipeCard({ recipe, cheapestStore, onOpen, onReplace }) {
   );
 }
 
-function RecipeModal({ recipe, cheapestStore, onClose }) {
+function RecipeModal({ recipe, cheapestStore, onClose, people = 1, alternatives = [], onReplaceWith, cheapestStoreFor }) {
+  const [mode, setMode] = useState('detail'); // detail | swap
+  // Quand on ouvre une autre recette, on revient toujours a la vue detail
+  React.useEffect(() => { setMode('detail'); }, [recipe && recipe.id]);
   if (!recipe) return null;
+  const portions = Math.max(1, Math.round(people));
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-[fadeIn_0.25s_ease-out]" onClick={onClose}>
       <div
@@ -887,6 +1050,45 @@ function RecipeModal({ recipe, cheapestStore, onClose }) {
           <X className="h-4 w-4" />
         </button>
 
+        {mode === 'swap' ? (
+          /* ---------- SELECTEUR D'ALTERNATIVES ---------- */
+          <div className="overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}>
+            <div className="p-6 sm:p-7">
+              <button onClick={() => setMode('detail')} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 mb-4 transition-colors">
+                <ChevronLeft className="h-4 w-4" /> Retour
+              </button>
+              <h3 className="text-lg font-bold text-slate-900 mb-1">Changer ce repas</h3>
+              <p className="text-sm text-slate-500 mb-5">Autres recettes compatibles avec ton équipement et tes régimes.</p>
+              {alternatives.length === 0 ? (
+                <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 border border-slate-100 p-4 text-sm text-slate-500">
+                  <AlertCircle className="h-4 w-4 text-slate-400 mt-0.5 flex-none" /> Aucune autre recette compatible pour l'instant — élargis ton équipement ou tes enseignes pour plus de choix.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2.5">
+                  {alternatives.map(alt => {
+                    const st = cheapestStoreFor ? cheapestStoreFor(alt) : cheapestStore;
+                    return (
+                      <button
+                        key={alt.id}
+                        onClick={() => { onReplaceWith && onReplaceWith(alt); }}
+                        className="flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-3 text-left transition-all hover:border-emerald-300 hover:shadow-sm active:scale-[0.99]"
+                      >
+                        <div className="h-14 w-14 flex-none rounded-xl flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(150deg, ${alt.accent}1a, ${alt.accent}06 60%)` }}>
+                          <DishImage recipe={alt} size={44} rounded="rounded-none" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-800 leading-snug line-clamp-2">{alt.name}</p>
+                          <p className="text-xs text-slate-400 mt-0.5"><Clock className="inline h-3 w-3 -mt-0.5" /> {alt.prepTime} min</p>
+                        </div>
+                        <span className="flex-none text-sm font-bold text-emerald-600">{fmtEuro(alt.prices[st])}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}>
           <div className="relative h-44 flex items-center justify-center overflow-hidden" style={{ background: `linear-gradient(150deg, ${recipe.accent}22, ${recipe.accent}06 65%)` }}>
             <div className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 30% 20%, ${recipe.accent}30, transparent 60%)` }} />
@@ -906,16 +1108,32 @@ function RecipeModal({ recipe, cheapestStore, onClose }) {
               })}
             </div>
 
+            {/* Bouton pour changer de recette a cet emplacement du menu */}
+            {onReplaceWith && (
+              <button
+                onClick={() => setMode('swap')}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50/50 transition-all mb-5 animate-[fadeSlideIn_0.4s_ease-out_0.12s_both]"
+              >
+                <RotateCcw className="h-4 w-4" /> Changer ce repas
+              </button>
+            )}
+
             <div className="rounded-2xl bg-emerald-50/80 p-4 mb-5 flex items-center justify-between animate-[fadeSlideIn_0.4s_ease-out_0.15s_both]">
               <span className="text-sm text-emerald-800">Meilleur prix chez <b>{SUPERMARKETS.find(s => s.id === cheapestStore)?.name}</b></span>
               <span className="text-lg font-bold text-emerald-700">{fmtEuro(recipe.prices[cheapestStore])}</span>
             </div>
 
-            <p className="text-xs font-semibold text-slate-500 mb-3 animate-[fadeSlideIn_0.4s_ease-out_0.18s_both]">INGRÉDIENTS</p>
-            <ul className="space-y-2 mb-4 animate-[fadeSlideIn_0.4s_ease-out_0.2s_both]">
+            <div className="flex items-center justify-between mb-3 animate-[fadeSlideIn_0.4s_ease-out_0.18s_both]">
+              <p className="text-xs font-semibold text-slate-500">INGRÉDIENTS</p>
+              <span className="text-[11px] font-medium text-slate-400">pour {portions} personne{portions > 1 ? 's' : ''}</span>
+            </div>
+            <ul className="space-y-1.5 mb-4 animate-[fadeSlideIn_0.4s_ease-out_0.2s_both]">
               {recipe.ingredients.map((ing, i) => (
-                <li key={i} className="flex items-center gap-2.5 text-sm text-slate-600">
-                  <span className="h-1.5 w-1.5 rounded-full bg-slate-300 flex-none" /> {ing.n} <span className="text-slate-300">·</span> <span className="text-slate-400">{ing.a}</span>
+                <li key={i} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50/70 px-3 py-2 text-sm">
+                  <span className="flex items-center gap-2.5 min-w-0 text-slate-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300 flex-none" /> <span className="truncate">{ing.n}</span>
+                  </span>
+                  <span className="flex-none font-semibold text-slate-900">{ingredientQty(ing, people)}</span>
                 </li>
               ))}
             </ul>
@@ -955,6 +1173,7 @@ function RecipeModal({ recipe, cheapestStore, onClose }) {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
@@ -962,18 +1181,21 @@ function RecipeModal({ recipe, cheapestStore, onClose }) {
 
 function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
   const grouped = useMemo(() => {
-    const map = {};
-    const seen = new Set();
+    // On additionne les quantites d'un meme ingredient sur toutes les recettes du menu
+    const acc = {}; // nom -> { name, aisle, store, estPrice, amount, unit }
     recipes.forEach(r => {
       const store = cheapestStoreFor(r);
       const perIngredient = r.ingredients.length ? (r.prices[store] * people) / r.ingredients.length : 0;
       r.ingredients.forEach(ing => {
-        const key = ing.n;
-        if (seen.has(key)) return;
-        seen.add(key);
-        (map[ing.a] = map[ing.a] || []).push({ name: ing.n, store, estPrice: perIngredient });
+        const spec = qtySpec(ing);
+        const amt = rawAmount(spec, people);
+        if (!acc[ing.n]) acc[ing.n] = { name: ing.n, aisle: ing.a, store, estPrice: 0, amount: 0, unit: spec.u };
+        acc[ing.n].estPrice += perIngredient;
+        acc[ing.n].amount += amt;
       });
     });
+    const map = {};
+    Object.values(acc).forEach(item => { item.qty = fmtQty(item.amount, item.unit); (map[item.aisle] = map[item.aisle] || []).push(item); });
     return map;
   }, [recipes, people]);
   const [checked, setChecked] = useState({});
@@ -983,7 +1205,7 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
   const totalCost = recipes.reduce((sum, r) => sum + r.prices[cheapestStoreFor(r)] * people, 0);
 
   const handleCopy = () => {
-    const text = AISLE_ORDER.filter(a => grouped[a]).map(a => `${a}:\n` + grouped[a].map(i => `- ${i.name} (${SUPERMARKETS.find(s=>s.id===i.store)?.name}, ≈${fmtEuro(i.estPrice)})`).join('\n')).join('\n\n');
+    const text = AISLE_ORDER.filter(a => grouped[a]).map(a => `${a}:\n` + grouped[a].map(i => `- ${i.name} — ${i.qty} (${SUPERMARKETS.find(s=>s.id===i.store)?.name}, ≈${fmtEuro(i.estPrice)})`).join('\n')).join('\n\n');
     navigator.clipboard?.writeText(text).catch(() => {});
     setCopied(true); setTimeout(() => setCopied(false), 1800);
   };
@@ -1010,7 +1232,10 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
                     <span className={`flex h-5 w-5 flex-none items-center justify-center rounded-md border transition-all ${checked[item.name] ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 group-hover:border-emerald-400'}`}>
                       {checked[item.name] && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
                     </span>
-                    <span className={`text-sm transition-all ${checked[item.name] ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{item.name}</span>
+                    <span className={`text-sm transition-all min-w-0 ${checked[item.name] ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                      <span className="truncate">{item.name}</span>
+                      <span className="ml-2 text-xs font-semibold text-slate-500">{item.qty}</span>
+                    </span>
                   </span>
                   <span className="flex-none flex items-center gap-2">
                     <span className="text-[11px] font-semibold text-slate-500">≈{fmtEuro(item.estPrice)}</span>
@@ -1035,7 +1260,7 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
 }
 
 function Dashboard({ data, plan, setPlan, onRestart }) {
-  const [openRecipe, setOpenRecipe] = useState(null);
+  const [open, setOpen] = useState(null); // { recipe, index }
   const [viewByDay, setViewByDay] = useState(false);
   const cheapestStoreFor = useCallback((recipe) => {
     const candidates = data.stores.length ? data.stores : SUPERMARKETS.map(s => s.id);
@@ -1046,16 +1271,37 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
   const actualCost = plan.reduce((sum, r) => sum + r.prices[cheapestStoreFor(r)] * people, 0);
   const classicCost = plan.reduce((sum, r) => sum + Math.max(...Object.values(r.prices)) * people, 0);
 
-  const replaceRecipe = (idx) => {
+  // Type de repas correspondant a un emplacement du plan (le plan est range par type puis par jour)
+  const mealTypesUsed = data.mealTypes.length ? data.mealTypes : ['dejeuner', 'diner'];
+  const slotMealType = (idx) => mealTypesUsed[Math.floor(idx / data.days)];
+
+  // Toutes les recettes compatibles pour cet emplacement, hors recettes deja au menu, triees par prix croissant
+  const getAlternatives = (idx) => {
+    const mt = slotMealType(idx);
     const usedIds = new Set(plan.map(r => r.id));
-    const pool = RECIPES.filter(r =>
-      r.equipment.every(e => data.equipment.includes(e)) &&
-      data.diets.every(d => r.diets.includes(d)) &&
-      !usedIds.has(r.id)
-    );
+    return RECIPES
+      .filter(r =>
+        r.mealType.includes(mt) &&
+        r.equipment.every(e => data.equipment.includes(e)) &&
+        data.diets.every(d => r.diets.includes(d)) &&
+        !matchesDislikes(r, data.dislikes) &&
+        !usedIds.has(r.id)
+      )
+      .sort((a, b) => cheapestPrice(a, data.stores) - cheapestPrice(b, data.stores));
+  };
+
+  // Remplacement aleatoire rapide (bouton sur la vignette)
+  const replaceRecipe = (idx) => {
+    const pool = getAlternatives(idx);
     if (!pool.length) return;
-    const replacement = pool[Math.floor(Math.random() * pool.length)];
+    const replacement = pool[Math.floor(Math.random() * Math.min(pool.length, 8))];
     setPlan(p => p.map((r, i) => i === idx ? replacement : r));
+  };
+
+  // Remplacement par une recette precise choisie dans le selecteur
+  const replaceRecipeWith = (idx, newRecipe) => {
+    setPlan(p => p.map((r, i) => i === idx ? newRecipe : r));
+    setOpen(o => (o ? { ...o, recipe: newRecipe } : o));
   };
 
   const mealTypeLabel = { petitdej: 'Petit-déjeuner', dejeuner: 'Déjeuner', diner: 'Dîner' };
@@ -1101,7 +1347,7 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {group.items.map(({ index, recipe }) => (
-                      <RecipeCard key={recipe.id + index} recipe={recipe} cheapestStore={cheapestStoreFor(recipe)} onOpen={() => setOpenRecipe(recipe)} onReplace={() => replaceRecipe(index)} />
+                      <RecipeCard key={recipe.id + index} recipe={recipe} cheapestStore={cheapestStoreFor(recipe)} onOpen={() => setOpen({ recipe, index })} onReplace={() => replaceRecipe(index)} />
                     ))}
                   </div>
                 </div>
@@ -1119,7 +1365,7 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
                           {React.createElement(mealTypeIcon[slot.mealType] || UtensilsCrossed, { className: 'h-3 w-3' })}
                           {mealTypeLabel[slot.mealType] || slot.mealType}
                         </p>
-                        <RecipeCard recipe={slot.recipe} cheapestStore={cheapestStoreFor(slot.recipe)} onOpen={() => setOpenRecipe(slot.recipe)} onReplace={() => replaceRecipe(slot.index)} />
+                        <RecipeCard recipe={slot.recipe} cheapestStore={cheapestStoreFor(slot.recipe)} onOpen={() => setOpen({ recipe: slot.recipe, index: slot.index })} onReplace={() => replaceRecipe(slot.index)} />
                       </div>
                     ))}
                   </div>
@@ -1131,7 +1377,15 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
         <div><ShoppingList recipes={plan} cheapestStoreFor={cheapestStoreFor} people={people} /></div>
       </div>
 
-      <RecipeModal recipe={openRecipe} cheapestStore={openRecipe ? cheapestStoreFor(openRecipe) : null} onClose={() => setOpenRecipe(null)} />
+      <RecipeModal
+        recipe={open?.recipe}
+        cheapestStore={open ? cheapestStoreFor(open.recipe) : null}
+        onClose={() => setOpen(null)}
+        people={people}
+        alternatives={open ? getAlternatives(open.index) : []}
+        onReplaceWith={(alt) => replaceRecipeWith(open.index, alt)}
+        cheapestStoreFor={cheapestStoreFor}
+      />
     </div>
   );
 }
