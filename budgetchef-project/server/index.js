@@ -85,7 +85,7 @@ app.post('/api/auth/signup', async (req, res) => {
     if (!REQUIRE_VERIFICATION) {
       markEmailVerified(user.id);
       setAuthCookie(res, user.id);
-      const fresh = findUserById.get(user.id);
+      const fresh = findUserById(user.id);
       return res.json({ demoLogin: true, user: publicUser(fresh) }); // connexion directe
     }
     res.json({ ok: true });

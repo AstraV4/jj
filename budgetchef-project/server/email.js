@@ -7,6 +7,16 @@ const MAIL_FROM = process.env.MAIL_FROM || 'onboarding@resend.dev';
 const SITE_NAME = process.env.SITE_NAME || 'BudgetChef Pro';
 const DISCORD_HANDLE = process.env.DISCORD_HANDLE || '';
 
+// Construit un champ "from" valide pour Resend, quel que soit le format de MAIL_FROM :
+//  - "no-reply@domaine.fr"            -> "BudgetChef Pro <no-reply@domaine.fr>"
+//  - "BudgetChef Pro <no@dom.fr>"     -> utilisé tel quel (pas de double emballage)
+function buildFrom() {
+  const raw = String(MAIL_FROM).trim();
+  if (raw.includes('<') && raw.includes('>')) return raw;
+  const name = String(SITE_NAME).replace(/[<>"\r\n]/g, '').trim();
+  return `${name} <${raw}>`;
+}
+
 async function send({ to, subject, html }) {
   if (!RESEND_API_KEY) {
     console.log(`\n[email:dev] (RESEND_API_KEY absente) À: ${to}\n[email:dev] Sujet: ${subject}\n`);
@@ -15,7 +25,7 @@ async function send({ to, subject, html }) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: `${SITE_NAME} <${MAIL_FROM}>`, to, subject, html }),
+    body: JSON.stringify({ from: buildFrom(), to, subject, html }),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
