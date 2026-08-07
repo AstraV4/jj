@@ -599,28 +599,16 @@ const photoCache = {}; // evite de refaire la meme requete plusieurs fois pour l
 
 function useDishPhoto(recipe) {
   const [url, setUrl] = useState(photoCache[recipe.id] || null);
-  const [failed, setFailed] = useState(!PEXELS_API_KEY);
+  const [failed, setFailed] = useState(false);
 
   React.useEffect(() => {
-    if (!PEXELS_API_KEY || photoCache[recipe.id] !== undefined) { if (photoCache[recipe.id]) setUrl(photoCache[recipe.id]); return; }
+    if (photoCache[recipe.id] !== undefined) { if (photoCache[recipe.id]) setUrl(photoCache[recipe.id]); else setFailed(true); return; }
     let cancelled = false;
-    const primary = PHOTO_QUERIES[recipe.id] || recipe.photoQuery || recipe.name;
-    const fallback = primary.split(/\s+/).slice(0, 2).join(' ') + ' food'; // repli generique si la recherche precise ne donne rien
-    const search = (q) => fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=1&orientation=square`, {
-      headers: { Authorization: PEXELS_API_KEY }
-    }).then(r => { if (!r.ok) throw new Error('pexels_error'); return r.json(); });
-
-    search(primary)
-      .then(data => {
-        const p = data.photos && data.photos[0];
-        if (p) return p;
-        return search(fallback).then(d2 => (d2.photos && d2.photos[0]) || null); // deuxieme tentative
-      })
-      .then(photo => {
-        const found = photo ? (photo.src.large || photo.src.medium || photo.src.small) : null;
-        photoCache[recipe.id] = found;
-        if (!cancelled) { if (found) setUrl(found); else setFailed(true); }
-      })
+    const q = PHOTO_QUERIES[recipe.id] || recipe.photoQuery || recipe.name;
+    // On demande la photo au serveur (qui détient la clé Pexels via variable d'environnement).
+    fetch(`/api/photo?query=${encodeURIComponent(q)}`)
+      .then(r => { if (!r.ok) throw new Error('no_photo'); return r.json(); })
+      .then(d => { const found = d && d.url ? d.url : null; photoCache[recipe.id] = found; if (!cancelled) { if (found) setUrl(found); else setFailed(true); } })
       .catch(() => { photoCache[recipe.id] = null; if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
   }, [recipe.id]);

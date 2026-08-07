@@ -194,6 +194,24 @@ app.put('/api/share/:code', (req, res) => {
   res.json(s);
 });
 
+/* ---------------- Photos des plats (proxy Pexels, clé côté serveur) ---------------- */
+const _photoCache = new Map();
+app.get('/api/photo', async (req, res) => {
+  const key = process.env.PEXELS_API_KEY;
+  const q = String(req.query.query || '').slice(0, 80).trim();
+  if (!key || !q) return res.json({ url: null });
+  if (_photoCache.has(q)) return res.json({ url: _photoCache.get(q) });
+  try {
+    const r = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=1&orientation=square`, { headers: { Authorization: key } });
+    if (!r.ok) throw new Error('pexels');
+    const d = await r.json();
+    const p = d.photos && d.photos[0];
+    const url = p ? (p.src.large || p.src.medium || p.src.small) : null;
+    _photoCache.set(q, url);
+    res.json({ url });
+  } catch { res.json({ url: null }); }
+});
+
 /* ---------------- Service du site compile (SPA) ---------------- */
 const distDir = path.join(__dirname, '..', 'dist');
 app.use(express.static(distDir));
