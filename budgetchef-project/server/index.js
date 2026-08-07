@@ -19,6 +19,10 @@ const PORT = process.env.PORT || 3000;
 const APP_URL = (process.env.APP_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-insecure-secret-change-me';
 const COOKIE = 'bc_token';
+// Vérification e-mail optionnelle. Désactivée par défaut : l'inscription connecte
+// directement (utile tant qu'un domaine d'envoi n'est pas vérifié chez Resend).
+// Pour l'exiger, mettre la variable REQUIRE_EMAIL_VERIFICATION = 1 sur Railway.
+const REQUIRE_VERIFICATION = process.env.REQUIRE_EMAIL_VERIFICATION === '1' || process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
 const secureCookies = APP_URL.startsWith('https');
 
 const app = express();
@@ -76,7 +80,14 @@ app.post('/api/auth/signup', async (req, res) => {
     const user = createUser(email, hash);
     const token = crypto.randomBytes(32).toString('hex');
     createVerificationToken(user.id, token);
-    await sendVerificationEmail(email, `${APP_URL}/api/auth/verify?token=${token}`);
+    // On tente l'envoi de l'e-mail, mais un échec ne bloque jamais l'inscription.
+    await sendVerificationEmail(email, `${APP_URL}/api/auth/verify?token=${token}`).catch(err => console.warn('email verif non envoyé:', err?.message));
+    if (!REQUIRE_VERIFICATION) {
+      markEmailVerified(user.id);
+      setAuthCookie(res, user.id);
+      const fresh = findUserById.get(user.id);
+      return res.json({ demoLogin: true, user: publicUser(fresh) }); // connexion directe
+    }
     res.json({ ok: true });
   } catch (e) {
     console.error('signup error', e);
@@ -103,7 +114,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'invalid_credentials' });
     }
-    if (!user.email_verified) return res.status(403).json({ error: 'email_not_verified' });
+    if (REQUIRE_VERIFICATION && !user.email_verified) return res.status(403).json({ error: 'email_not_verified' });
     setAuthCookie(res, user.id);
     res.json({ user: publicUser(user) });
   } catch (e) {
