@@ -2492,17 +2492,35 @@ function FridgeView({ onClose, people }) {
   );
 }
 
+function HeroThumb({ id, size = 68 }) {
+  const r = RECIPES.find(x => x.id === id);
+  if (!r) return null;
+  return (
+    <div className="overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-black/5" style={{ width: size, height: size }}>
+      <DishImage recipe={r} size={size} rounded="rounded-2xl" />
+    </div>
+  );
+}
+
 function HeroScreen({ onStart }) {
-  const floatEmojis = ['🍛','🍗','🌮','🥗','🍜','🐟'];
+  const thumbs = ['r129', 'r126', 'r121', 'r145', 'r101', 'r171']; // pizza, burger, tacos, poke, pancakes, salade
+  const positions = [3, 19, 36, 53, 69, 83];
   return (
     <div className="animate-[stepIn_0.4s_ease-out] text-center pt-4 sm:pt-10">
+      {/* Desktop : vignettes flottantes */}
       <div className="relative h-28 mb-2 hidden sm:block">
-        {floatEmojis.map((e, i) => (
-          <span
-            key={i}
-            className="absolute text-3xl opacity-70 animate-[floatY_4.5s_ease-in-out_infinite]"
-            style={{ left: `${8 + i * 17}%`, animationDelay: `${i * 0.35}s`, top: i % 2 === 0 ? '10%' : '40%' }}
-          >{e}</span>
+        {thumbs.map((id, i) => (
+          <div key={id} className="absolute animate-[floatY_5s_ease-in-out_infinite]" style={{ left: `${positions[i]}%`, top: i % 2 === 0 ? '2%' : '34%', animationDelay: `${i * 0.3}s` }}>
+            <HeroThumb id={id} size={68} />
+          </div>
+        ))}
+      </div>
+      {/* Mobile : rangée centrée de vignettes */}
+      <div className="flex sm:hidden items-center justify-center gap-2.5 mb-6">
+        {thumbs.slice(0, 4).map((id, i) => (
+          <div key={id} className="animate-[floatY_5s_ease-in-out_infinite]" style={{ animationDelay: `${i * 0.3}s` }}>
+            <HeroThumb id={id} size={58} />
+          </div>
         ))}
       </div>
       <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1.5 mb-6">
