@@ -469,16 +469,22 @@ function useDishPhoto(recipe) {
   const [failed, setFailed] = useState(!PEXELS_API_KEY);
 
   React.useEffect(() => {
-    if (!PEXELS_API_KEY || photoCache[recipe.id] !== undefined) return;
+    if (!PEXELS_API_KEY || photoCache[recipe.id] !== undefined) { if (photoCache[recipe.id]) setUrl(photoCache[recipe.id]); return; }
     let cancelled = false;
-    const query = recipe.photoQuery || recipe.name;
-    fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=square`, {
+    const primary = recipe.photoQuery || recipe.name;
+    const fallback = primary.split(/\s+/).slice(0, 2).join(' ') + ' food'; // repli generique si la recherche precise ne donne rien
+    const search = (q) => fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=1&orientation=square`, {
       headers: { Authorization: PEXELS_API_KEY }
-    })
-      .then(r => { if (!r.ok) throw new Error('pexels_error'); return r.json(); })
+    }).then(r => { if (!r.ok) throw new Error('pexels_error'); return r.json(); });
+
+    search(primary)
       .then(data => {
-        const photo = data.photos && data.photos[0];
-        const found = photo ? (photo.src.medium || photo.src.small) : null;
+        const p = data.photos && data.photos[0];
+        if (p) return p;
+        return search(fallback).then(d2 => (d2.photos && d2.photos[0]) || null); // deuxieme tentative
+      })
+      .then(photo => {
+        const found = photo ? (photo.src.large || photo.src.medium || photo.src.small) : null;
         photoCache[recipe.id] = found;
         if (!cancelled) { if (found) setUrl(found); else setFailed(true); }
       })
@@ -1204,10 +1210,64 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
   const allItems = Object.values(grouped).flat();
   const totalCost = recipes.reduce((sum, r) => sum + r.prices[cheapestStoreFor(r)] * people, 0);
 
+  // Texte partageable de la liste, reutilise par Copier et WhatsApp
+  const buildText = () =>
+    'BudgetChef Pro — Liste de courses\n\n' +
+    AISLE_ORDER.filter(a => grouped[a]).map(a =>
+      `${a} :\n` + grouped[a].map(i => `• ${i.name} — ${i.qty}  (${SUPERMARKETS.find(s => s.id === i.store)?.name}, ≈${fmtEuro(i.estPrice)})`).join('\n')
+    ).join('\n\n') +
+    `\n\nTotal estimé : ${fmtEuro(totalCost)}`;
+
   const handleCopy = () => {
-    const text = AISLE_ORDER.filter(a => grouped[a]).map(a => `${a}:\n` + grouped[a].map(i => `- ${i.name} — ${i.qty} (${SUPERMARKETS.find(s=>s.id===i.store)?.name}, ≈${fmtEuro(i.estPrice)})`).join('\n')).join('\n\n');
-    navigator.clipboard?.writeText(text).catch(() => {});
+    navigator.clipboard?.writeText(buildText()).catch(() => {});
     setCopied(true); setTimeout(() => setCopied(false), 1800);
+  };
+
+  // Ouvre WhatsApp (appli ou web) avec la liste pre-remplie
+  const handleWhatsApp = () => {
+    const url = 'https://wa.me/?text=' + encodeURIComponent(buildText());
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  // Genere un vrai PDF telechargeable de la liste de courses
+  const handlePDF = async () => {
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const marginX = 16;
+    let y = 20;
+    const pageH = doc.internal.pageSize.getHeight();
+    const newPageIfNeeded = (h) => { if (y + h > pageH - 16) { doc.addPage(); y = 20; } };
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(15, 23, 42);
+    doc.text('BudgetChef Pro', marginX, y); y += 7;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(100, 116, 139);
+    doc.text('Liste de courses de la semaine', marginX, y); y += 10;
+
+    AISLE_ORDER.filter(a => grouped[a]).forEach(aisle => {
+      newPageIfNeeded(14);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(16, 185, 129);
+      doc.text(aisle.toUpperCase(), marginX, y); y += 6;
+      doc.setDrawColor(226, 232, 240); doc.line(marginX, y - 3, 194, y - 3);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(51, 65, 85);
+      grouped[aisle].forEach(i => {
+        newPageIfNeeded(7);
+        const store = SUPERMARKETS.find(s => s.id === i.store)?.name || '';
+        doc.text(`[ ]  ${i.name} — ${i.qty}`, marginX, y);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`${store}  ~${fmtEuro(i.estPrice)}`, 194, y, { align: 'right' });
+        doc.setTextColor(51, 65, 85);
+        y += 6;
+      });
+      y += 4;
+    });
+
+    newPageIfNeeded(12);
+    doc.setDrawColor(226, 232, 240); doc.line(marginX, y, 194, y); y += 8;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(15, 23, 42);
+    doc.text('Total estime', marginX, y);
+    doc.text(fmtEuro(totalCost), 194, y, { align: 'right' });
+
+    doc.save('liste-de-courses-budgetchef.pdf');
   };
 
   return (
@@ -1249,8 +1309,8 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
       </div>
       <p className="text-[11px] text-slate-400 -mt-4 mb-4">≈ estimation par article (prix de la recette répartie sur ses ingrédients), pas un prix exact en magasin.</p>
       <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-100">
-        <button className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><Download className="h-3.5 w-3.5" /> Exporter en PDF</button>
-        <button className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><Package className="h-3.5 w-3.5" /> Envoyer par WhatsApp</button>
+        <button onClick={handlePDF} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><Download className="h-3.5 w-3.5" /> Exporter en PDF</button>
+        <button onClick={handleWhatsApp} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"><Package className="h-3.5 w-3.5" /> Envoyer par WhatsApp</button>
         <button onClick={handleCopy} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
           <Copy className="h-3.5 w-3.5" /> {copied ? 'Copié !' : 'Copier'}
         </button>
