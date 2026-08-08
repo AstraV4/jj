@@ -225,9 +225,17 @@ app.get('/api/photo', async (req, res) => {
 
 /* ---------------- Service du site compile (SPA) ---------------- */
 const distDir = path.join(__dirname, '..', 'dist');
-app.use(express.static(distDir));
+app.use(express.static(distDir, {
+  setHeaders: (res, filePath) => {
+    // index.html et sw.js ne doivent jamais être mis en cache par le navigateur
+    if (filePath.endsWith('index.html') || filePath.endsWith('sw.js')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  },
+}));
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'not_found' });
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(distDir, 'index.html'));
 });
 

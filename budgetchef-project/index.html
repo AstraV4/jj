@@ -13,9 +13,16 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      // Enregistre le service worker (PWA installable + cache), uniquement en https/localhost
-      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-        window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+      // PWA désactivée (fiabilité) : on désinstalle tout service worker existant
+      // et on vide les caches, pour éviter toute page blanche due à un cache périmé.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          if (regs.length) {
+            // sw.js est en mode auto-destruction : on le (ré)active pour nettoyer proprement.
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+          }
+        }).catch(() => {});
+        if (window.caches && caches.keys) { caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {}); }
       }
     </script>
   </body>

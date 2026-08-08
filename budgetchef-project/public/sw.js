@@ -1,15 +1,15 @@
-const CACHE = 'budgetchef-v1';
-self.addEventListener('install', (e) => { self.skipWaiting(); });
-self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;        // on ne touche pas aux appels API/externes
-  if (req.url.includes('/api/')) return;
-  e.respondWith(
-    caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(req);
-      const network = fetch(req).then(res => { if (res && res.status === 200) cache.put(req, res.clone()); return res; }).catch(() => cached);
-      return cached || network;                                                            // cache d'abord, sinon réseau
-    })
-  );
+// Service worker AUTO-DESTRUCTEUR : supprime tous les caches, se désinstalle,
+// puis recharge les pages ouvertes. Élimine les pages blanches dues à un cache périmé.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+      await self.registration.unregister();
+      const clients = await self.clients.matchAll({ type: 'window' });
+      clients.forEach((client) => client.navigate(client.url));
+    } catch (e) { /* ignore */ }
+  })());
 });
+// Pas de handler 'fetch' -> toutes les requêtes passent directement par le réseau.
