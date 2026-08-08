@@ -731,88 +731,34 @@ const STORE_DOMAIN = {
   monoprix: 'monoprix.fr', franprix: 'franprix.fr', cora: 'cora.fr',
   grandfrais: 'grandfrais.com', naturalia: 'naturalia.fr',
 };
-// Logos d'enseignes en VECTORIEL (bundlés) : toujours présents, jamais flous, sans réseau.
-// Rendus stylisés maison aux couleurs de chaque marque (repères d'identification).
+// Vrais logos d'enseignes chargés à l'exécution. Plusieurs sources en cascade
+// pour qu'aucun ne manque ; repli pastille couleur seulement si tout échoue (rare).
 function BrandLogo({ storeId, size = 32, rounded = 'rounded-lg' }) {
-  const common = { width: size, height: size, viewBox: '0 0 48 48', className: rounded, style: { display: 'block' } };
-  const bg = (c) => <rect x="2" y="2" width="44" height="44" rx="10" fill={c} />;
-  const white = () => <rect x="2" y="2" width="44" height="44" rx="10" fill="#fff" />;
-  const initial = (letter, color) => (
-    <text x="24" y="25" textAnchor="middle" dominantBaseline="central" fontFamily="Arial, sans-serif" fontWeight="800" fontSize="22" fill={color}>{letter}</text>
-  );
-  let mark;
-  switch (storeId) {
-    case 'carrefour':
-      mark = (<>{white()}
-        <path d="M22 10 L11 24 L22 38" fill="none" stroke="#004E9F" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M26 10 L37 24 L26 38" fill="none" stroke="#ED1C24" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-      </>); break;
-    case 'lidl':
-      mark = (<>{white()}
-        <circle cx="24" cy="23" r="14" fill="#FFE500" />
-        <rect x="16.5" y="15.5" width="15" height="15" rx="2" fill="#0050AA" />
-        <rect x="20.5" y="19.5" width="7" height="7" fill="#E30613" />
-      </>); break;
-    case 'aldi':
-      mark = (<>{white()}
-        <path d="M9 33 Q24 9 39 33" fill="none" stroke="#001E64" strokeWidth="4" strokeLinecap="round" />
-        <path d="M14 33 Q24 16 34 33" fill="none" stroke="#00A0E1" strokeWidth="4" strokeLinecap="round" />
-        <path d="M19 33 Q24 23 29 33" fill="none" stroke="#F49800" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="24" cy="35" r="2.4" fill="#E2001A" />
-      </>); break;
-    case 'leclerc':
-      mark = (<>{white()}
-        <path d="M32 11 A15 15 0 1 0 32 37" fill="none" stroke="#F59C00" strokeWidth="4.5" strokeLinecap="round" />
-        <path d="M30 17 A9 9 0 1 0 30 31" fill="none" stroke="#F59C00" strokeWidth="4.5" strokeLinecap="round" />
-        <circle cx="24" cy="24" r="3.4" fill="#003DA5" />
-      </>); break;
-    case 'auchan':
-      mark = (<>{white()}
-        <path d="M8 29 C15 15 25 16 30 24 C33 20 38 20 41 17 C39 29 30 33 22 32 C16 31 11 31 8 29 Z" fill="#E2001A" />
-        <circle cx="15" cy="26" r="1.6" fill="#fff" />
-      </>); break;
-    case 'intermarche':
-      mark = (<>{bg('#E2001A')}
-        <path d="M15 31 L24 17 L33 31" fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M19 31 L24 24 L29 31" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.55" />
-      </>); break;
-    case 'casino':
-      mark = (<>{bg('#E2001A')}
-        <path d="M32 18 A9 9 0 1 0 32 30" fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" />
-        <circle cx="31" cy="31" r="3.2" fill="#00A651" />
-      </>); break;
-    case 'monoprix':
-      mark = (<>{bg('#E5007D')}
-        {initial('M', '#fff')}
-        <circle cx="14" cy="15" r="2.2" fill="#FFD400" /><circle cx="34" cy="15" r="2.2" fill="#00A0E1" /><circle cx="34" cy="33" r="2.2" fill="#00A651" />
-      </>); break;
-    case 'cora':
-      mark = (<>{bg('#E30613')}
-        <path d="M31 19 A8.5 8.5 0 1 0 31 29" fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" />
-        <path d="M30 12 q4 3 0 7" fill="none" stroke="#8BC53F" strokeWidth="3" strokeLinecap="round" />
-      </>); break;
-    case 'franprix':
-      mark = (<>{bg('#4FA82E')}
-        {initial('f', '#fff')}
-        <path d="M31 13 q5 2 2 8 q-5 -1 -2 -8Z" fill="#F39200" />
-      </>); break;
-    case 'grandfrais':
-      mark = (<>{white()}
-        <rect x="2" y="2" width="44" height="44" rx="10" fill="#3E8A2E" />
-        <text x="24" y="20" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="800" fontSize="13" fill="#fff">G</text>
-        <text x="24" y="34" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="800" fontSize="13" fill="#FFE500">F</text>
-      </>); break;
-    case 'naturalia':
-      mark = (<>{bg('#6DA544')}
-        <path d="M24 34 C16 30 15 20 24 14 C33 20 32 30 24 34 Z" fill="#fff" />
-        <path d="M24 33 L24 18" stroke="#6DA544" strokeWidth="2" strokeLinecap="round" />
-      </>); break;
-    default: {
-      const s = SUPERMARKETS.find(x => x.id === storeId);
-      mark = (<>{bg(s?.color || '#64748B')}{initial((s?.name || '?').slice(0, 1), '#fff')}</>);
-    }
+  const s = SUPERMARKETS.find(x => x.id === storeId);
+  const d = STORE_DOMAIN[storeId];
+  const candidates = d ? [
+    `https://icon.horse/icon/${d}`,
+    `https://logo.clearbit.com/${d}?size=256`,
+    `https://www.google.com/s2/favicons?sz=256&domain=${d}`,
+  ] : [];
+  const [idx, setIdx] = React.useState(0);
+  const [failed, setFailed] = React.useState(!d);
+  if (failed || idx >= candidates.length) {
+    return (
+      <span className={`inline-flex items-center justify-center ${rounded} font-bold text-white`} style={{ width: size, height: size, background: s?.color || '#64748B', fontSize: size * 0.42 }}>
+        {s ? s.name.slice(0, 1) : '?'}
+      </span>
+    );
   }
-  return <svg {...common}>{mark}</svg>;
+  return (
+    <img
+      src={candidates[idx]} alt={s?.name || ''} title={s?.name || ''}
+      width={size} height={size} loading="lazy" decoding="async"
+      onError={() => { if (idx < candidates.length - 1) setIdx(idx + 1); else setFailed(true); }}
+      className={`inline-block bg-white object-contain ${rounded}`}
+      style={{ width: size, height: size, padding: Math.max(1, size * 0.08) }}
+    />
+  );
 }
 
 // Affiche le logo de l'enseigne si USE_STORE_LOGOS est actif et que le fichier existe,
@@ -2547,6 +2493,18 @@ function Dashboard({ data, setData, plan, setPlan, onRestart }) {
         onReplaceWith={(alt) => replaceRecipeWith(open.index, alt)}
         cheapestStoreFor={cheapestStoreFor}
       />
+      {showFilters && (
+        <FilterModal
+          data={data}
+          onClose={() => setShowFilters(false)}
+          onApply={(patch) => {
+            const nd = { ...data, ...patch };
+            setData(nd);
+            setPlan(buildPlan(nd, cooked));
+            setShowFilters(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -2895,18 +2853,6 @@ function FridgeView({ onClose, people }) {
         </div>
       </div>
       <RecipeModal recipe={open} cheapestStore={open ? cheapestGlobal(open) : null} onClose={() => setOpen(null)} people={people} />
-      {showFilters && (
-        <FilterModal
-          data={data}
-          onClose={() => setShowFilters(false)}
-          onApply={(patch) => {
-            const nd = { ...data, ...patch };
-            setData(nd);
-            setPlan(buildPlan(nd, cooked));
-            setShowFilters(false);
-          }}
-        />
-      )}
     </div>
   );
 }
