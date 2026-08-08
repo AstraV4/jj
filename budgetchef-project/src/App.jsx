@@ -735,9 +735,15 @@ const STORE_DOMAIN = {
 function BrandLogo({ storeId, size = 32, rounded = 'rounded-lg' }) {
   const s = SUPERMARKETS.find(x => x.id === storeId);
   const d = STORE_DOMAIN[storeId];
-  const candidates = d ? [`https://logo.clearbit.com/${d}?size=128`, `https://www.google.com/s2/favicons?sz=128&domain=${d}`] : [];
+  // Sources haute résolution (jamais agrandies -> jamais floues) ; repli pastille nette.
+  const candidates = d ? [
+    `https://logo.clearbit.com/${d}?size=256`,
+    `https://www.google.com/s2/favicons?sz=256&domain=${d}`,
+    `https://icons.duckduckgo.com/ip3/${d}.ico`,
+  ] : [];
   const [idx, setIdx] = React.useState(0);
   const [failed, setFailed] = React.useState(!d);
+  const next = () => { if (idx < candidates.length - 1) setIdx(idx + 1); else setFailed(true); };
   if (failed || idx >= candidates.length) {
     return (
       <span className={`inline-flex items-center justify-center ${rounded} font-bold text-white`} style={{ width: size, height: size, background: s?.color || '#64748B', fontSize: size * 0.42 }}>
@@ -748,10 +754,11 @@ function BrandLogo({ storeId, size = 32, rounded = 'rounded-lg' }) {
   return (
     <img
       src={candidates[idx]} alt={s?.name || ''} title={s?.name || ''}
-      width={size} height={size} loading="lazy"
-      onError={() => { if (idx < candidates.length - 1) setIdx(idx + 1); else setFailed(true); }}
+      width={size} height={size} loading="lazy" decoding="async"
+      onError={next}
+      onLoad={(e) => { const w = e.target.naturalWidth || 0; if (w && w < 56) next(); }} // trop basse résolution -> source suivante
       className={`inline-block bg-white object-contain ${rounded}`}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, imageRendering: 'auto' }}
     />
   );
 }
@@ -2139,9 +2146,124 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
   );
 }
 
-function Dashboard({ data, plan, setPlan, onRestart }) {
+/* =========================================================================
+   PANNEAU FILTRES (sur le menu généré) — ajuster sans tout recommencer
+   ========================================================================= */
+function FilterModal({ data, onClose, onApply }) {
+  const [stores, setStores] = useState(data.stores);
+  const [diets, setDiets] = useState(data.diets);
+  const [equipment, setEquipment] = useState(data.equipment);
+  const [goals, setGoals] = useState(data.goals);
+  const [excludeAllergens, setExcludeAllergens] = useState(data.excludeAllergens || []);
+  const [maxPrep, setMaxPrep] = useState(data.maxPrep || 0);
+  const [budget, setBudget] = useState(data.budget);
+
+  const tog = (arr, set, id) => set(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
+  const apply = () => onApply({ stores, diets, equipment: equipment.length ? equipment : data.equipment, goals, excludeAllergens, maxPrep, budget });
+
+  const Chip = ({ on, onClick, children, tone = 'emerald' }) => (
+    <button onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-all active:scale-95 ${
+        on ? (tone === 'red' ? 'bg-red-500 text-white shadow-sm' : 'bg-emerald-500 text-white shadow-sm')
+           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+      {children}
+    </button>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]" onClick={onClose} />
+      <div className="relative z-10 flex max-h-[92vh] w-full sm:max-w-lg flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl animate-[sheetUp_0.28s_cubic-bezier(0.16,1,0.3,1)]">
+        {/* En-tête */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50"><Filter className="h-4 w-4 text-emerald-600" /></span>
+            <h3 className="text-base font-bold text-slate-900">Filtrer mon menu</h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"><X className="h-5 w-5" /></button>
+        </div>
+
+        {/* Corps défilant */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-7">
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Magasins</p>
+            <div className="grid grid-cols-3 gap-2">
+              {SUPERMARKETS.map(s => {
+                const on = stores.includes(s.id);
+                return (
+                  <button key={s.id} onClick={() => tog(stores, setStores, s.id)}
+                    className={`flex flex-col items-center gap-1.5 rounded-xl border p-2.5 transition-all active:scale-95 ${on ? 'border-emerald-500 bg-emerald-50/70 ring-1 ring-emerald-500/20' : 'border-slate-200 hover:border-slate-300'}`}>
+                    <BrandLogo storeId={s.id} size={28} rounded="rounded-md" />
+                    <span className={`text-[11px] font-medium ${on ? 'text-emerald-800' : 'text-slate-600'}`}>{s.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Régimes</p>
+            <div className="flex flex-wrap gap-2">
+              {DIETS.map(x => <Chip key={x.id} on={diets.includes(x.id)} onClick={() => tog(diets, setDiets, x.id)}>{x.name}</Chip>)}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Équipement</p>
+            <div className="flex flex-wrap gap-2">
+              {EQUIPMENT.map(x => <Chip key={x.id} on={equipment.includes(x.id)} onClick={() => tog(equipment, setEquipment, x.id)}>{x.name}</Chip>)}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Objectifs</p>
+            <div className="flex flex-wrap gap-2">
+              {GOALS.map(x => <Chip key={x.id} on={goals.includes(x.id)} onClick={() => tog(goals, setGoals, x.id)}>{x.name}</Chip>)}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Allergies à exclure</p>
+            <div className="flex flex-wrap gap-2">
+              {Object.keys(ALLERGEN_LABELS).map(a => <Chip key={a} tone="red" on={excludeAllergens.includes(a)} onClick={() => tog(excludeAllergens, setExcludeAllergens, a)}>sans {ALLERGEN_LABELS[a].toLowerCase()}</Chip>)}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Temps de préparation max</p>
+            <div className="grid grid-cols-4 gap-2">
+              {[{ v: 15, l: '≤ 15 min' }, { v: 30, l: '≤ 30 min' }, { v: 45, l: '≤ 45 min' }, { v: 0, l: 'Peu importe' }].map(o => (
+                <button key={o.v} onClick={() => setMaxPrep(o.v)}
+                  className={`rounded-xl border px-2 py-2.5 text-xs font-medium transition-all active:scale-95 ${maxPrep === o.v ? 'border-emerald-500 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/20' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>{o.l}</button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Budget de la semaine</p>
+              <span className="text-sm font-bold text-emerald-600">{fmtEuro(budget)}</span>
+            </div>
+            <input type="range" min="20" max="200" step="5" value={budget} onChange={e => setBudget(Number(e.target.value))} className="w-full h-2 rounded-full bg-slate-100 accent-emerald-500" />
+          </div>
+        </div>
+
+        {/* Pied fixe */}
+        <div className="flex items-center gap-3 border-t border-slate-100 px-5 py-4">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Annuler</button>
+          <button onClick={apply} className="flex-[2] inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition-colors active:scale-[0.98]">
+            <Sparkles className="h-4 w-4 text-emerald-400" /> Appliquer et régénérer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ data, setData, plan, setPlan, onRestart }) {
   const [open, setOpen] = useState(null); // { recipe, index }
   const [viewByDay, setViewByDay] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const { ustate, savePrefs } = useAuth();
   const cooked = ustate?.cooked || [];
   const cheapestStoreFor = useCallback((recipe) => {
@@ -2253,6 +2375,9 @@ function Dashboard({ data, plan, setPlan, onRestart }) {
               <TrendingDown className="h-3.5 w-3.5" /> Ajuster au budget
             </button>
           )}
+          <button onClick={() => setShowFilters(true)} title="Changer magasins, régimes, équipement…" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <Filter className="h-3.5 w-3.5 text-emerald-600" /> Filtres
+          </button>
           <button onClick={() => setPlan(buildPlan(data, cooked))} title="Générer d'autres recettes avec les mêmes réglages"
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> Régénérer
@@ -2718,6 +2843,18 @@ function FridgeView({ onClose, people }) {
         </div>
       </div>
       <RecipeModal recipe={open} cheapestStore={open ? cheapestGlobal(open) : null} onClose={() => setOpen(null)} people={people} />
+      {showFilters && (
+        <FilterModal
+          data={data}
+          onClose={() => setShowFilters(false)}
+          onApply={(patch) => {
+            const nd = { ...data, ...patch };
+            setData(nd);
+            setPlan(buildPlan(nd, cooked));
+            setShowFilters(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -2929,6 +3066,7 @@ export default function App() {
         @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
         @keyframes slideUp { from { opacity:0; transform: translateY(24px); } to { opacity:1; transform: translateY(0); } }
         @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+        @keyframes sheetUp { from { opacity:0; transform: translateY(24px) scale(0.98); } to { opacity:1; transform: translateY(0) scale(1); } }
         @keyframes shimmer { 100% { transform: translateX(100%); } }
         @keyframes modalRise { from { opacity:0; transform: translateY(40px) scale(0.98); } to { opacity:1; transform: translateY(0) scale(1); } }
         @keyframes fadeSlideIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
@@ -2983,7 +3121,7 @@ export default function App() {
           </div>
         )}
         {screen === 'loading' && <LoadingScreen />}
-        {screen === 'dashboard' && <Dashboard data={data} plan={plan} setPlan={setPlan} onRestart={restart} />}
+        {screen === 'dashboard' && <Dashboard data={data} setData={setData} plan={plan} setPlan={setPlan} onRestart={restart} />}
       </main>
 
       {/* Barre de navigation mobile : defile vers la section correspondante */}
