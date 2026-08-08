@@ -2492,66 +2492,153 @@ function FridgeView({ onClose, people }) {
   );
 }
 
-function HeroThumb({ id, size = 68 }) {
+const DISPLAY_FONT = "'Bricolage Grotesque','Inter',ui-sans-serif,system-ui,sans-serif";
+
+function HeroDish({ id, size = 76, rot = 0, tag }) {
   const r = RECIPES.find(x => x.id === id);
   if (!r) return null;
   return (
-    <div className="overflow-hidden rounded-2xl bg-white shadow-lg ring-1 ring-black/5" style={{ width: size, height: size }}>
-      <DishImage recipe={r} size={size} rounded="rounded-2xl" />
+    <div className="relative shrink-0" style={{ transform: `rotate(${rot}deg)` }}>
+      <div className="overflow-hidden rounded-2xl bg-white shadow-[0_16px_40px_-12px_rgba(15,23,42,0.35)] ring-1 ring-black/5" style={{ width: size, height: size }}>
+        <DishImage recipe={r} size={size} rounded="rounded-2xl" />
+      </div>
+      {tag && <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white shadow-md">{tag}</span>}
     </div>
   );
 }
 
-function HeroScreen({ onStart }) {
-  const thumbs = ['r129', 'r126', 'r121', 'r145', 'r101', 'r171']; // pizza, burger, tacos, poke, pancakes, salade
-  const positions = [3, 19, 36, 53, 69, 83];
+function HeroScreen({ onStart, onBrowse }) {
+  // Charge une police d'affichage soignée (repli propre si indisponible)
+  useEffect(() => {
+    if (typeof document === 'undefined' || document.getElementById('bc-fonts')) return;
+    const l = document.createElement('link');
+    l.id = 'bc-fonts'; l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap';
+    document.head.appendChild(l);
+  }, []);
+
+  const dishes = [
+    { id: 'r129', rot: -6, y: 10 },
+    { id: 'r126', rot: 5, y: -8, tag: '≈ 2,30 € / pers' },
+    { id: 'r121', rot: -3, y: 4 },
+    { id: 'r145', rot: 6, y: -10 },
+    { id: 'r101', rot: -5, y: 8 },
+    { id: 'r171', rot: 4, y: -4 },
+  ];
+  const steps = [
+    { n: '1', title: 'Tes réglages', desc: 'Budget, enseignes, équipement et goûts, en 4 étapes rapides.' },
+    { n: '2', title: 'Ton menu', desc: 'Des recettes optimisées automatiquement au meilleur prix.' },
+    { n: '3', title: 'Ta liste', desc: 'Courses triées par rayon, prêtes à partager ou imprimer.' },
+  ];
+  const features = [
+    { icon: MapPin, tint: 'text-emerald-600', bg: 'bg-emerald-50', title: 'Prix comparés localement', desc: 'On compare tes enseignes et on garde le moins cher pour chaque produit.' },
+    { icon: CookingPot, tint: 'text-amber-600', bg: 'bg-amber-50', title: 'Adapté à ta cuisine', desc: 'Uniquement des recettes réalisables avec ton équipement et ton temps.' },
+    { icon: TrendingDown, tint: 'text-sky-600', bg: 'bg-sky-50', title: 'Économies visibles', desc: 'Chaque euro économisé face au prix moyen, affiché clairement.' },
+  ];
+
   return (
-    <div className="animate-[stepIn_0.4s_ease-out] text-center pt-4 sm:pt-10">
-      {/* Desktop : vignettes flottantes */}
-      <div className="relative h-28 mb-2 hidden sm:block">
-        {thumbs.map((id, i) => (
-          <div key={id} className="absolute animate-[floatY_5s_ease-in-out_infinite]" style={{ left: `${positions[i]}%`, top: i % 2 === 0 ? '2%' : '34%', animationDelay: `${i * 0.3}s` }}>
-            <HeroThumb id={id} size={68} />
+    <div className="animate-[stepIn_0.4s_ease-out] text-center">
+      {/* Halo d'ambiance */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(60%_60%_at_50%_0%,rgba(16,185,129,0.14),transparent_70%)]" />
+
+      {/* Vitrine de plats — desktop : composition alignée */}
+      <div className="relative mx-auto mb-8 hidden h-[132px] max-w-2xl sm:flex items-center justify-center gap-4">
+        {dishes.map((d, i) => (
+          <div key={d.id} className="animate-[floatY_6s_ease-in-out_infinite]" style={{ transform: `translateY(${d.y}px)`, animationDelay: `${i * 0.35}s` }}>
+            <HeroDish id={d.id} size={78} rot={d.rot} tag={d.tag} />
           </div>
         ))}
       </div>
-      {/* Mobile : rangée centrée de vignettes */}
-      <div className="flex sm:hidden items-center justify-center gap-2.5 mb-6">
-        {thumbs.slice(0, 4).map((id, i) => (
-          <div key={id} className="animate-[floatY_5s_ease-in-out_infinite]" style={{ animationDelay: `${i * 0.3}s` }}>
-            <HeroThumb id={id} size={58} />
+      {/* Vitrine de plats — mobile : 3 tuiles */}
+      <div className="mb-7 flex items-center justify-center gap-3 sm:hidden">
+        {dishes.slice(0, 3).map((d, i) => (
+          <div key={d.id} className="animate-[floatY_6s_ease-in-out_infinite]" style={{ animationDelay: `${i * 0.35}s` }}>
+            <HeroDish id={d.id} size={62} rot={d.rot} />
           </div>
         ))}
       </div>
-      <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1.5 mb-6">
-        <Wallet className="h-3.5 w-3.5 text-emerald-600" />
-        <span className="text-xs font-semibold text-emerald-700">Optimisation budget en temps réel</span>
+
+      <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50/80 px-3.5 py-1.5 mb-6">
+        <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
+        <span className="text-xs font-semibold text-emerald-700">Budget optimisé en temps réel</span>
       </div>
-      <h1 className="text-3xl sm:text-5xl font-bold text-slate-900 mb-4 leading-[1.1] tracking-tight">
-        Mange bien.<br /><span className="text-emerald-600">Dépense juste.</span>
+
+      <h1 className="mx-auto max-w-2xl text-[2.5rem] leading-[1.02] sm:text-6xl font-extrabold tracking-tight text-slate-900" style={{ fontFamily: DISPLAY_FONT }}>
+        Mange bien.<br /><span className="bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">Dépense juste.</span>
       </h1>
-      <p className="text-sm sm:text-base text-slate-500 max-w-md mx-auto mb-9">
+      <p className="mx-auto mt-5 max-w-lg text-base text-slate-500 leading-relaxed">
         Ton menu de la semaine, calculé au centime près selon tes supermarchés, ton matériel et tes goûts. Zéro gaspillage, budget maîtrisé.
       </p>
-      <button
-        onClick={onStart}
-        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-7 py-3.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-slate-800 hover:shadow-lg active:scale-[0.97]"
-      >
-        Créer mon menu <ArrowRight className="h-4 w-4" />
-      </button>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-14 max-w-2xl mx-auto text-left">
+
+      <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <button onClick={onStart} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-7 py-3.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-slate-800 hover:shadow-xl active:scale-[0.97] w-full sm:w-auto">
+          Créer mon menu <ArrowRight className="h-4 w-4" />
+        </button>
+        {onBrowse && (
+          <button onClick={onBrowse} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-7 py-3.5 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-50 w-full sm:w-auto">
+            <Search className="h-4 w-4" /> Voir les recettes
+          </button>
+        )}
+      </div>
+      <p className="mt-3 text-xs text-slate-400">Gratuit · sans carte bancaire · prêt en 2 minutes</p>
+
+      {/* Stats réelles */}
+      <div className="mx-auto mt-12 grid max-w-xl grid-cols-3 gap-4 border-y border-slate-200/70 py-6">
         {[
-          { icon: MapPin, title: 'Prix comparés localement', desc: 'Selon les enseignes que tu fréquentes vraiment.' },
-          { icon: CookingPot, title: "Selon ton équipement", desc: "Seulement des recettes que tu peux vraiment cuisiner." },
-          { icon: TrendingDown, title: 'Économies visibles', desc: 'Chaque euro économisé, affiché clairement.' },
-        ].map((f, i) => (
-          <div key={i} className="rounded-2xl border border-slate-200/70 bg-white p-5">
-            <f.icon className="h-5 w-5 text-emerald-600 mb-3" strokeWidth={1.75} />
-            <p className="text-sm font-semibold text-slate-800 mb-1">{f.title}</p>
-            <p className="text-xs text-slate-500 leading-relaxed">{f.desc}</p>
+          { v: `${RECIPES.length}`, l: 'recettes maison' },
+          { v: `${SUPERMARKETS.length}`, l: 'enseignes comparées' },
+          { v: 'jusqu\u2019à 30%', l: 'd\u2019économies' },
+        ].map((s, i) => (
+          <div key={i}>
+            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900" style={{ fontFamily: DISPLAY_FONT }}>{s.v}</div>
+            <div className="mt-1 text-[11px] sm:text-xs text-slate-500">{s.l}</div>
           </div>
         ))}
       </div>
+
+      {/* Comment ça marche (vraie séquence -> numérotation justifiée) */}
+      <div className="mx-auto mt-16 max-w-3xl text-left">
+        <p className="mb-5 text-center text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Comment ça marche</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {steps.map((s) => (
+            <div key={s.n} className="relative rounded-2xl border border-slate-200/70 bg-white p-5">
+              <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white" style={{ fontFamily: DISPLAY_FONT }}>{s.n}</div>
+              <p className="text-sm font-semibold text-slate-800">{s.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Atouts */}
+      <div className="mx-auto mt-6 grid max-w-3xl gap-4 text-left sm:grid-cols-3">
+        {features.map((f, i) => (
+          <div key={i} className="group rounded-2xl border border-slate-200/70 bg-white p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg">
+            <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${f.bg}`}>
+              <f.icon className={`h-5 w-5 ${f.tint}`} strokeWidth={1.9} />
+            </div>
+            <p className="text-sm font-semibold text-slate-800">{f.title}</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">{f.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Rappel CTA */}
+      <div className="mx-auto mt-14 max-w-3xl overflow-hidden rounded-3xl bg-slate-900 px-6 py-10 text-center">
+        <h3 className="text-2xl font-bold text-white" style={{ fontFamily: DISPLAY_FONT }}>Prêt à alléger tes courses ?</h3>
+        <p className="mx-auto mt-2 max-w-md text-sm text-slate-300">Génère ton premier menu de la semaine en moins de deux minutes.</p>
+        <button onClick={onStart} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-7 py-3.5 text-sm font-semibold text-white transition-all hover:bg-emerald-600 active:scale-[0.97]">
+          Créer mon menu <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      <footer className="mt-12 flex flex-col items-center gap-2 border-t border-slate-200/70 pt-8 text-center">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500"><ChefHat className="h-3.5 w-3.5 text-white" /></div>
+          <span className="text-sm font-bold text-slate-900">BudgetChef <span className="text-emerald-600">Pro</span></span>
+        </div>
+        <p className="text-xs text-slate-400">Bien manger sans se ruiner. © 2026 BudgetChef Pro.</p>
+      </footer>
     </div>
   );
 }
@@ -2651,7 +2738,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-5xl px-5 sm:px-8 py-10 sm:py-14 pb-24">
-        {screen === 'hero' && <div className="max-w-2xl mx-auto"><HeroScreen onStart={startWizard} /></div>}
+        {screen === 'hero' && <div className="max-w-3xl mx-auto"><HeroScreen onStart={startWizard} onBrowse={() => setExplore('browse')} /></div>}
         {screen === 'wizard' && (
           <div className="max-w-xl mx-auto">
             <ProgressBar step={step} total={4} />
