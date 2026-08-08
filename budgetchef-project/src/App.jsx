@@ -1094,6 +1094,45 @@ function packagingNote(name, amount, unit) {
   return null;
 }
 
+/* ---- Marque distributeur conseillée par enseigne (généralement la moins chère) ---- */
+const STORE_BRAND = {
+  lidl: 'marque Lidl (1ᵉʳ prix)',
+  aldi: 'marque Aldi (1ᵉʳ prix)',
+  carrefour: 'Carrefour (ou Carrefour Classic\u2019)',
+  leclerc: 'Marque Repère / Éco+',
+  intermarche: 'Chabrior / Pâturages (Intermarché)',
+  auchan: 'Auchan (ou Pouce)',
+  casino: 'Casino (ou Prix Malin)',
+  monoprix: 'Monoprix',
+  franprix: 'Franprix',
+  cora: 'Cora (ou Belle France)',
+  grandfrais: 'au poids / producteur',
+  naturalia: 'Naturalia (bio)',
+};
+const FISH_RE = /saumon|cabillaud|poisson|thon frais|truite|maquereau|gambas|crevette|fruits de mer/i;
+const CHEESE_RE = /fromage|parmesan|gruy|emmental|cheddar|mozzarella|feta|ricotta|reblochon|chèvre/i;
+
+// Marque à privilégier pour payer le moins cher
+function brandFor(name, aisle, store) {
+  if (aisle === 'Fruits & Légumes') return 'au poids (vrac) — le moins cher';
+  return STORE_BRAND[store] || 'marque distributeur du magasin';
+}
+
+// Où trouver le produit (et l'astuce prix quand il y a un comptoir)
+function placeFor(name, aisle) {
+  const n = name.toLowerCase();
+  if (aisle === 'Boucherie') return { txt: 'Rayon frais en barquette (souvent moins cher qu\u2019à la boucherie/coupe)', counter: true };
+  if (aisle === 'Fruits & Légumes') return { txt: 'Rayon fruits & légumes (au poids)', counter: false };
+  if (aisle === 'Boulangerie') return { txt: 'Rayon pain / boulangerie du magasin', counter: false };
+  if (aisle === 'Surgelés') return { txt: 'Rayon surgelés', counter: false };
+  if (aisle === 'Frais') {
+    if (FISH_RE.test(n)) return { txt: 'Rayon frais en barquette (moins cher qu\u2019à la poissonnerie/coupe)', counter: true };
+    if (CHEESE_RE.test(n)) return { txt: 'Rayon frais en libre-service (moins cher qu\u2019à la coupe/fromagerie)', counter: true };
+    return { txt: 'Rayon frais (crémerie)', counter: false };
+  }
+  return { txt: 'Rayon épicerie', counter: false };
+}
+
 /* ---- Score anti-gaspi : ingrédients réutilisés sur plusieurs recettes du menu ---- */
 function antiGaspiScore(recipes) {
   const count = {};
@@ -1753,7 +1792,7 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
     AISLE_ORDER.filter(a => grouped[a]).map(a => {
       const list = grouped[a].filter(i => !owned[i.name]);
       if (!list.length) return '';
-      return `${a} :\n` + list.map(i => `${emojiFor(i.name, i.aisle)} ${i.name} — ${i.qty}  (${SUPERMARKETS.find(s => s.id === i.store)?.name}, ≈${fmtEuro(i.estPrice)})`).join('\n');
+      return `${a} :\n` + list.map(i => `${emojiFor(i.name, i.aisle)} ${i.name} — ${i.qty}\n   ↳ ${brandFor(i.name, i.aisle, i.store)} · ${placeFor(i.name, i.aisle).txt} · ${SUPERMARKETS.find(s => s.id === i.store)?.name} ≈${fmtEuro(i.estPrice)}`).join('\n');
     }).filter(Boolean).join('\n\n') +
     (extras.length ? `\n\nAjouts :\n` + extras.map(e => `• ${e.name}`).join('\n') : '') +
     `\n\nTotal estimé : ${fmtEuro(totalCost)}`;
@@ -1779,7 +1818,17 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
       doc.text(aisle.toUpperCase(), marginX, y); y += 6;
       doc.setDrawColor(226, 232, 240); doc.line(marginX, y - 3, 194, y - 3);
       doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(51, 65, 85);
-      list.forEach(i => { nl(7); const st = SUPERMARKETS.find(s => s.id === i.store)?.name || ''; doc.text(`[ ]  ${i.name} — ${i.qty}`, marginX, y); doc.setTextColor(148, 163, 184); doc.text(`${st}  ~${fmtEuro(i.estPrice)}`, 194, y, { align: 'right' }); doc.setTextColor(51, 65, 85); y += 6; });
+      list.forEach(i => {
+        nl(11);
+        const st = SUPERMARKETS.find(s => s.id === i.store)?.name || '';
+        doc.setFontSize(10); doc.setTextColor(51, 65, 85);
+        doc.text(`[ ]  ${i.name} — ${i.qty}`, marginX, y);
+        doc.text(`${st}  ~${fmtEuro(i.estPrice)}`, 194, y, { align: 'right' });
+        y += 4.5;
+        doc.setFontSize(8); doc.setTextColor(120, 130, 145);
+        doc.text(`${brandFor(i.name, i.aisle, i.store)}  ·  ${placeFor(i.name, i.aisle).txt}`, marginX + 6, y);
+        y += 5.5;
+      });
       y += 4;
     });
     nl(12); doc.setDrawColor(226, 232, 240); doc.line(marginX, y, 194, y); y += 8;
@@ -1790,6 +1839,8 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
 
   const Row = (item) => {
     const pack = packagingNote(item.name, item.amount, item.unit);
+    const brand = brandFor(item.name, item.aisle, item.store);
+    const place = placeFor(item.name, item.aisle);
     return (
     <li key={item.name} className="group">
       <div className="flex items-center justify-between gap-2">
@@ -1809,7 +1860,13 @@ function ShoppingList({ recipes, cheapestStoreFor, people = 1 }) {
           <button onClick={() => toggleOwned(item.name)} title="J'ai déjà (garde-manger)" className={`rounded-md p-1 transition-colors ${owned[item.name] ? 'text-emerald-600' : 'text-slate-300 hover:text-slate-500'}`}><Refrigerator className="h-3.5 w-3.5" /></button>
         </span>
       </div>
-      {pack && !owned[item.name] && <p className="ml-7 text-[10px] text-slate-400">{pack}</p>}
+      {!owned[item.name] && (
+        <div className="ml-7 mt-0.5 space-y-0.5">
+          <p className="flex items-center gap-1 text-[10px] text-slate-500"><Package className="h-3 w-3 flex-none text-slate-400" /> Marque conseillée : <span className="font-medium text-slate-600">{brand}</span></p>
+          <p className={`flex items-center gap-1 text-[10px] ${place.counter ? 'text-emerald-600' : 'text-slate-400'}`}><MapPin className="h-3 w-3 flex-none" /> {place.txt}</p>
+          {pack && <p className="text-[10px] text-slate-400">{pack}</p>}
+        </div>
+      )}
     </li>
     );
   };
