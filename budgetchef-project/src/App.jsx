@@ -2542,18 +2542,18 @@ function HeroScreen({ onStart, onBrowse }) {
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-[radial-gradient(60%_60%_at_50%_0%,rgba(16,185,129,0.14),transparent_70%)]" />
 
       {/* Vitrine de plats — desktop : composition alignée */}
-      <div className="relative mx-auto mb-8 hidden h-[132px] max-w-2xl sm:flex items-center justify-center gap-4">
+      <div className="relative mx-auto mb-10 hidden h-[168px] max-w-3xl sm:flex items-center justify-center gap-5">
         {dishes.map((d, i) => (
           <div key={d.id} className="animate-[floatY_6s_ease-in-out_infinite]" style={{ transform: `translateY(${d.y}px)`, animationDelay: `${i * 0.35}s` }}>
-            <HeroDish id={d.id} size={78} rot={d.rot} tag={d.tag} />
+            <HeroDish id={d.id} size={104} rot={d.rot} tag={d.tag} />
           </div>
         ))}
       </div>
       {/* Vitrine de plats — mobile : 3 tuiles */}
-      <div className="mb-7 flex items-center justify-center gap-3 sm:hidden">
+      <div className="mb-8 flex items-center justify-center gap-3 sm:hidden">
         {dishes.slice(0, 3).map((d, i) => (
           <div key={d.id} className="animate-[floatY_6s_ease-in-out_infinite]" style={{ animationDelay: `${i * 0.35}s` }}>
-            <HeroDish id={d.id} size={62} rot={d.rot} />
+            <HeroDish id={d.id} size={82} rot={d.rot} />
           </div>
         ))}
       </div>
